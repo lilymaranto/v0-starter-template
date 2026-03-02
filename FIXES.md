@@ -94,6 +94,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability. Must match NFL resolution behavior.
 - **Failure means:** One or more of: configId missing from SyncPayload, no fallbackConfigId param in sync machine, no native override path (`configId ?? fallbackConfigId`), or setUser doesn't accept resolvedConfigId.
 - **Fix:** Resolution order must be: native detail.configId (if present) > explicit web configId > template fallback. Ensure SyncPayload includes configId, createSyncStateMachine accepts fallbackConfigId, applyIncomingSync resolves `configId ?? fallbackConfigId`, and setUser receives the resolved value.
+- Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
+- Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 
 ## Check 15: Evidence report
 
