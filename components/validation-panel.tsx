@@ -74,7 +74,7 @@ export function ValidationPanel() {
           status: hasOpenSession ? ("pass" as const) : ("warn" as const),
           detail: hasOpenSession
             ? "Braze SDK present. openSession only invoked through setUser owner path."
-            : "Braze SDK not initialized yet. Verify openSession is only called inside bridge-entry setUser().",
+            : "Braze SDK not initialized yet. Verify openSession is only called inside bridge-entry setUser(). See FIXES.md #1.",
         };
       })()
     );
@@ -99,7 +99,7 @@ export function ValidationPanel() {
         id: "check-2",
         label: "2. Web switch: no bounce",
         status: "warn",
-        detail: "Could not import sync-state module.",
+        detail: "Could not import sync-state module. See FIXES.md #2.",
       });
     }
 
@@ -133,7 +133,7 @@ export function ValidationPanel() {
         id: "check-3",
         label: "3. Native switch: single apply + detail forwarding",
         status: "warn",
-        detail: "Could not import modules for inspection.",
+        detail: "Could not import modules for inspection. See FIXES.md #3.",
       });
     }
 
@@ -159,7 +159,7 @@ export function ValidationPanel() {
         id: "check-4",
         label: "4. Custom events: Braze + native path",
         status: "warn",
-        detail: "Could not import track-event module.",
+        detail: "Could not import track-event module. See FIXES.md #4.",
       });
     }
 
@@ -206,7 +206,7 @@ export function ValidationPanel() {
         id: "check-6",
         label: "6. Surface check: DemoBridge confined",
         status: "warn",
-        detail: "Could not import modules for surface inspection.",
+        detail: "Could not import modules for surface inspection. See FIXES.md #6.",
       });
     }
 
@@ -252,7 +252,7 @@ export function ValidationPanel() {
           id: "check-7",
           label: "7. Iframe check",
           status: "warn",
-          detail: "Could not reach /api/check-csp. Ensure the route exists.",
+          detail: "Could not reach /api/check-csp. Ensure the route exists. See FIXES.md #7.",
         });
       }
     }
@@ -284,7 +284,7 @@ export function ValidationPanel() {
         id: "check-8",
         label: "8. User IDs case-preserved",
         status: "warn",
-        detail: "Could not import modules for inspection.",
+        detail: "Could not import modules for inspection. See FIXES.md #8.",
       });
     }
 
@@ -311,7 +311,7 @@ export function ValidationPanel() {
       } else if (!has300) {
         status = "warn";
         detail =
-          "Could not confirm 300ms from source inspection. Verify manualLockMs manually.";
+          "Could not confirm 300ms from source inspection. Verify manualLockMs manually. See FIXES.md #9.";
       }
       checks.push({
         id: "check-9",
@@ -324,7 +324,7 @@ export function ValidationPanel() {
         id: "check-9",
         label: "9. Lock window = 300ms",
         status: "warn",
-        detail: "Could not import sync-state module.",
+        detail: "Could not import sync-state module. See FIXES.md #9.",
       });
     }
 
@@ -350,7 +350,7 @@ export function ValidationPanel() {
         id: "check-10",
         label: "10. Event path: no DemoBridge.logEvent",
         status: "warn",
-        detail: "Could not import track-event module.",
+        detail: "Could not import track-event module. See FIXES.md #10.",
       });
     }
 
@@ -387,7 +387,7 @@ export function ValidationPanel() {
         id: "check-11",
         label: "11. Single identity owner path",
         status: "warn",
-        detail: "Could not import braze module.",
+        detail: "Could not import braze module. See FIXES.md #11.",
       });
     }
 
@@ -398,7 +398,7 @@ export function ValidationPanel() {
         label: "12. Prompt filename hygiene",
         status: "pass",
         detail:
-          "Runtime OK. Manually verify no SOLCON_PROMPT_V0.md or STARTER_PROMPT references in app source files.",
+          "Runtime OK. Manually verify no SOLCON_PROMPT_V0.md or STARTER_PROMPT references in app source files. See FIXES.md #12.",
       });
     }
 
@@ -411,7 +411,7 @@ export function ValidationPanel() {
         label: "13. No mixed bridge imports",
         status: "pass",
         detail:
-          "App uses single bridge entry at lib/bridge-entry.ts. Verify no starter/finisher mixing in app imports.",
+          "App uses single bridge entry at lib/bridge-entry.ts. Verify no starter/finisher mixing in app imports. See FIXES.md #13.",
       });
     }
 
