@@ -10,7 +10,8 @@ import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 
-const ROOT = path.resolve(process.cwd());
+// Run from project root: npx tsx scripts/update-integrity-manifest.ts
+const ROOT = process.cwd();
 
 const HARDENED_FILES = [
   "lib/braze.ts",
@@ -20,7 +21,7 @@ const HARDENED_FILES = [
   "middleware.ts",
 ];
 
-const manifest: Record<string, string> = {};
+const manifest = {};
 
 for (const rel of HARDENED_FILES) {
   const full = path.join(ROOT, rel);
