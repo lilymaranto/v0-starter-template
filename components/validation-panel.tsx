@@ -701,13 +701,8 @@ export function ValidationPanel() {
       }
     }
 
-    // Sort: failures first, then warns, then passes
-    const priority = { fail: 0, warn: 1, pass: 2 };
-    checks.sort((a, b) => priority[a.status] - priority[b.status]);
-
     // ---------------------------------------------------------------
     // 17) Hardened file protection — structural invariants + opt-in integrity
-    //     Always rendered last (after sort).
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
       const invariants = scanData.structuralInvariants ?? [];
@@ -733,7 +728,7 @@ export function ValidationPanel() {
       }
 
       if (!manifestFound) {
-        parts.push("Integrity manifest: not found (run scripts/update-integrity-manifest.ts)");
+        parts.push("Integrity manifest: not found (run npm run update-integrity-manifest)");
       } else if (integrityOk) {
         parts.push(`Integrity hashes: ${integrity.length}/${integrity.length} match`);
       } else {
@@ -769,6 +764,17 @@ export function ValidationPanel() {
         detail: "Could not reach /api/scan-source for invariant/integrity inspection. See FIXES.md #17.",
       });
     }
+
+    // Sort: fail/warn first, then pass. Within each group, numerical order.
+    const statusPriority = { fail: 0, warn: 1, pass: 2 };
+    checks.sort((a, b) => {
+      const sp = statusPriority[a.status] - statusPriority[b.status];
+      if (sp !== 0) return sp;
+      // Numerical order within same status group
+      const numA = parseInt(a.id.replace("check-", ""), 10) || 0;
+      const numB = parseInt(b.id.replace("check-", ""), 10) || 0;
+      return numA - numB;
+    });
 
     setResults(checks);
     setRunning(false);

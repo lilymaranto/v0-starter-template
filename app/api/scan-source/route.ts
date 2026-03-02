@@ -156,8 +156,8 @@ export async function GET() {
       rel: "lib/braze.ts",
       required: [
         { label: "@hardened header", pattern: /@hardened/ },
-        { label: "no changeUser call", pattern: /^(?!.*(?:\/\/|\/\*)).*\bchangeUser\s*\(/m },
-        { label: "no openSession call", pattern: /^(?!.*(?:\/\/|\/\*)).*\bopenSession\s*\(/m },
+        { label: "no changeUser call", pattern: /\bchangeUser\s*\(/ },
+        { label: "no openSession call", pattern: /\bopenSession\s*\(/ },
         { label: "allowUserSuppliedJavascript: false", pattern: /allowUserSuppliedJavascript:\s*false/ },
       ],
     },
@@ -223,21 +223,28 @@ export async function GET() {
     }
 
     const content = fs.readFileSync(filePath, "utf-8");
+    const contentLines = content.split("\n");
+    // Build a code-only version (non-comment lines) for absent checks
+    const codeOnlyContent = contentLines
+      .filter((l) => !isComment(l))
+      .join("\n");
+
     const present: string[] = [];
     const missing: string[] = [];
     const absentChecks = MUST_BE_ABSENT[entry.rel] ?? [];
 
     for (const req of entry.required) {
-      const found = req.pattern.test(content);
       if (absentChecks.includes(req.label)) {
-        // Inverted: pattern must NOT match
+        // Inverted: pattern must NOT match in code-only content (ignoring comments)
+        const found = req.pattern.test(codeOnlyContent);
         if (found) {
           missing.push(req.label);
         } else {
           present.push(req.label);
         }
       } else {
-        // Normal: pattern must match
+        // Normal: pattern must match anywhere in the full file
+        const found = req.pattern.test(content);
         if (found) {
           present.push(req.label);
         } else {
