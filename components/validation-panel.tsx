@@ -14,26 +14,6 @@ export function ValidationPanel() {
   const [results, setResults] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
   const [hasRun, setHasRun] = useState(false);
-  const [manifestMsg, setManifestMsg] = useState<string | null>(null);
-  const [freezing, setFreezing] = useState(false);
-
-  const freezeManifest = useCallback(async () => {
-    setFreezing(true);
-    setManifestMsg(null);
-    try {
-      const res = await fetch("/api/gen-manifest", { method: "POST" });
-      const body = await res.json();
-      if (body.error) {
-        setManifestMsg(`Error: ${body.error}`);
-      } else {
-        setManifestMsg(`Manifest written (${Object.keys(body.manifest).length} files hashed).`);
-      }
-    } catch {
-      setManifestMsg("Could not reach /api/gen-manifest.");
-    }
-    setFreezing(false);
-  }, []);
-
   const runChecks = useCallback(async () => {
     setRunning(true);
     const checks: CheckResult[] = [];
@@ -819,18 +799,6 @@ export function ValidationPanel() {
         />
         {running ? "Running..." : "Run All Checks"}
       </button>
-
-      <button
-        onClick={freezeManifest}
-        disabled={freezing}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
-      >
-        {freezing ? "Writing..." : "Freeze Integrity Manifest"}
-      </button>
-
-      {manifestMsg && (
-        <p className="text-[10px] text-muted-foreground text-center">{manifestMsg}</p>
-      )}
 
       {!hasRun && (
         <p className="text-xs text-muted-foreground text-center">

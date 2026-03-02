@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "update-integrity-manifest": "npx tsx scripts/update-integrity-manifest.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
