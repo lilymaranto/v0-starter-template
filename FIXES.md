@@ -32,8 +32,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 ## Check 4: Custom event forwarding
 
 - **Why it exists:** Prevents duplicate custom events across web/native.
-- **Failure means:** Events are not routed through the canonical helper path.
-- **Fix:** Route custom events through `trackEvent` and use Braze path consistently.
+- **Failure means:** Any parallel custom-event forwarding path exists (for example DemoBridge.logEvent/logCustomEvent).
+- **Fix:** Use one path only: trackEvent -> braze.logCustomEvent. Do NOT forward custom events directly through DemoBridge.
 
 ## Check 5: Browser fallback
 

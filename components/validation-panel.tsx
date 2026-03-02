@@ -138,8 +138,7 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 4) Custom event — appears in Braze path and native Event Log
-    //    (via hook or explicit fallback)
+    // 4) Custom event — Braze-only routing, no DemoBridge forwarding
     // ---------------------------------------------------------------
     try {
       const trackMod = await import("@/lib/track-event");
@@ -148,16 +147,16 @@ export function ValidationPanel() {
         src.includes("logCustomEvent") || src.includes("logEvent");
       checks.push({
         id: "check-4",
-        label: "4. Custom events: Braze + native path",
+        label: "4. Custom events: Braze-only path",
         status: hasBrazePath ? "pass" : "fail",
         detail: hasBrazePath
-          ? "trackEvent routes events through Braze. Native Event Log receives events via the Braze SDK hook or explicit fallback."
+          ? "trackEvent routes events through Braze only (trackEvent -> braze.logCustomEvent). No DemoBridge custom-event forwarding."
           : "trackEvent does not appear to call logCustomEvent. See FIXES.md #4.",
       });
     } catch {
       checks.push({
         id: "check-4",
-        label: "4. Custom events: Braze + native path",
+        label: "4. Custom events: Braze-only path",
         status: "warn",
         detail: "Could not import track-event module. See FIXES.md #4.",
       });
@@ -666,7 +665,7 @@ export function ValidationPanel() {
       label: "17. Evidence report",
       status: "pass",
       detail:
-        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution. See FIXES.md #17.",
+        "Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | Event path: trackEvent -> braze.logCustomEvent only | configId: native override > explicit web > fallback. See FIXES.md #17.",
     });
 
     setResults(checks);
