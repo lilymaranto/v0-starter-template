@@ -1,5 +1,6 @@
 // Centralized Braze SDK initialization.
 // Keeps all Braze config in one place.
+// Identity calls (changeUser/openSession) are exported for use by bridge-entry.ts.
 
 let brazeInitialized = false;
 
@@ -21,7 +22,7 @@ export async function initBraze() {
   braze.openSession();
   brazeInitialized = true;
 
-  // Expose on window for starter_track_event.js compatibility
+  // Expose on window for track-event.ts compatibility
   (window as unknown as Record<string, unknown>).braze = braze;
 
   return braze;
@@ -32,10 +33,17 @@ export async function getBraze() {
   return import("@braze/web-sdk");
 }
 
+// Granular identity helpers used by bridge-entry.ts to keep changeUser single-threaded.
 export async function changeUser(userId: string) {
   const braze = await getBraze();
   if (!braze) return;
   braze.changeUser(userId);
+}
+
+export async function openSession() {
+  const braze = await getBraze();
+  if (!braze) return;
+  braze.openSession();
 }
 
 export async function logCustomEvent(

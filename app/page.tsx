@@ -6,12 +6,12 @@ import { UserSelector } from "@/components/user-selector";
 import { VideoPlayer } from "@/components/video-player";
 import { CategoryButtons } from "@/components/category-buttons";
 import { EventLog, type LogEntry } from "@/components/event-log";
-import {
-  initBraze,
-  changeUser,
-  logCustomEvent,
-  setCustomAttribute,
-} from "@/lib/braze";
+import { initBraze, logCustomEvent, setCustomAttribute } from "@/lib/braze";
+import { startWebSession, setUser, listenForNative } from "@/lib/bridge-entry";
+import { createSyncStateMachine, type SyncStateMachine } from "@/lib/sync-state";
+import { trackEvent } from "@/lib/track-event";
+
+const CONFIG_ID = "solcon-video-player";
 
 function timestamp() {
   return new Date().toLocaleTimeString("en-US", {
@@ -32,6 +32,7 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const initialized = useRef(false);
+  const syncMachine = useRef<SyncStateMachine | null>(null);
 
   const addLog = useCallback(
     (type: LogEntry["type"], message: string) => {
@@ -43,31 +44,63 @@ export default function Home() {
     []
   );
 
-  // Initialize Braze SDK on mount
+  // Initialize Braze SDK, sync state machine, bridge session, and native listener
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
     initBraze().then(() => {
       addLog("init", "Braze SDK initialized");
-      // Set default user
-      changeUser("viewer_a");
-      addLog("user_change", 'User set to "viewer_a"');
+
+      // Create sync state machine with dedupe, echo suppression, and lock window
+      syncMachine.current = createSyncStateMachine({
+        initialUserId: "viewer_a",
+        renderUser: (userId: string) => {
+          setActiveUser(userId);
+          addLog("user_change", `Sync applied: user = "${userId}"`);
+        },
+        setUser: (userId: string, reason: string) => {
+          setUser(userId, reason);
+        },
+      });
+
+      // Start initial web session through centralized bridge
+      startWebSession({ userId: "viewer_a", configId: CONFIG_ID });
+      addLog("init", "Bridge session started for viewer_a");
+
+      // Listen for native-origin user changes
+      listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
+        addLog("init", `Native push received: ${incomingUserId}`);
+        syncMachine.current?.applyIncomingSync(
+          {
+            userId: incomingUserId,
+            sessionId: (detail?.sessionId as string) ?? undefined,
+            authority: (detail?.authority as string) ?? undefined,
+            reason: (detail?.reason as string) ?? "manual",
+          },
+          { fromNative: true }
+        );
+      });
     });
   }, [addLog]);
 
-  // Handle user switch
-  async function handleSelectUser(userId: string) {
-    setActiveUser(userId);
-    await changeUser(userId);
-    addLog("user_change", `User changed to "${userId}"`);
+  // Handle web-originated user switch via sync machine
+  function handleSelectUser(userId: string) {
+    const applied = syncMachine.current?.applyIncomingSync(
+      { userId, reason: "manual" },
+      { fromNative: false }
+    );
+    if (applied) {
+      addLog("user_change", `Web switch: user changed to "${userId}"`);
+    }
   }
 
-  // Handle watch button click
+  // Handle watch button click -- routes through trackEvent helper
   async function handleWatch(category: string) {
     setActiveCategory(category);
 
-    // 1. Log video_started event with category property
+    // 1. Log video_started event through unified trackEvent (native + Braze)
+    trackEvent("video_started", { category });
     await logCustomEvent("video_started", { category });
     addLog("event", `video_started { category: "${category}" }`);
 

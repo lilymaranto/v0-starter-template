@@ -1,5 +1,13 @@
-// Adapted from solcon-starter-v0/starter_bridge_entry.js
-// Centralized DemoBridge wrappers with safe browser fallback.
+// Centralized identity sync entrypoint for SolCon builds (finisher pattern).
+// Callers import { startWebSession, setUser, listenForNative } from this file.
+// Do not call DemoBridge.* elsewhere; keep changeUser routing single-threaded.
+//
+// AI/V0 hint: Wherever you call startWebSession/setUser, also call
+// braze.changeUser(userId) then braze.openSession() (for the Braze Web SDK)
+// so SDK analytics match the session traffic we emit. Keep those calls
+// centralized here or in a single wrapper to avoid scattered changeUser calls.
+
+import { changeUser as brazeChangeUser, openSession as brazeOpenSession } from "@/lib/braze";
 
 declare global {
   interface Window {
@@ -11,7 +19,7 @@ declare global {
       }) => void;
       setConfigId?: (id: string) => void;
       initNativeListener?: (
-        cb: (incomingUserId: string, detail: unknown) => void
+        cb: (incomingUserId: string, detail: Record<string, unknown>) => void
       ) => void;
     };
   }
@@ -25,7 +33,7 @@ function hasBridge(): boolean {
   const available = Boolean(window.DemoBridge);
   if (!available && !warnedMissingBridge) {
     warnedMissingBridge = true;
-    console.warn("[Bridge] DemoBridge missing; browser fallback active.");
+    console.warn("[Bridge] DemoBridge missing; running in browser fallback mode.");
   }
   return available;
 }
@@ -38,16 +46,27 @@ export function startWebSession({
   configId: string;
 }) {
   currentConfigId = configId;
+
+  // Centralized Braze identity call
+  brazeChangeUser(userId);
+  brazeOpenSession();
+
   if (!hasBridge() || !window.DemoBridge?.startSession) return;
   window.DemoBridge.startSession({ userId, configId, reason: "default" });
 }
 
 export function setUser(userId: string, reason = "manual") {
   if (!userId) return;
+
+  // Centralized Braze identity call
+  brazeChangeUser(userId);
+  brazeOpenSession();
+
   if (!hasBridge() || !window.DemoBridge?.startSession) return;
   if (currentConfigId && window.DemoBridge?.setConfigId) {
     window.DemoBridge.setConfigId(currentConfigId);
   }
+  // Use startSession so web leads a fresh session/handshake on every changeUser.
   window.DemoBridge.startSession({
     userId,
     configId: currentConfigId,
@@ -56,7 +75,7 @@ export function setUser(userId: string, reason = "manual") {
 }
 
 export function listenForNative(
-  changeUserFn: (userId: string, detail: unknown) => void
+  changeUserFn: (userId: string, detail: Record<string, unknown>) => void
 ) {
   if (typeof changeUserFn !== "function") {
     throw new Error("listenForNative requires changeUserFn(userId, detail)");
@@ -65,5 +84,6 @@ export function listenForNative(
   window.DemoBridge.initNativeListener((incomingUserId, detail) => {
     if (!incomingUserId) return;
     changeUserFn(incomingUserId, detail);
+    // detail.reason / detail.sessionId / detail.configId available to caller
   });
 }
