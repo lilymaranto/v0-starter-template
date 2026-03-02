@@ -392,26 +392,70 @@ export function ValidationPanel() {
     }
 
 
-    {
+    // ---------------------------------------------------------------
+    // 12) Prompt filename hygiene + 13) Mixed bridge module check
+    //     Real source scan via /api/scan-source
+    // ---------------------------------------------------------------
+    try {
+      const res = await fetch("/api/scan-source");
+      const body = await res.json();
+      const legacyHits: { file: string; line: number; match: string }[] =
+        body.legacyPromptHits ?? [];
+      const mixedHits: { file: string; line: number; match: string }[] =
+        body.mixedBridgeHits ?? [];
+      const scanned: number = body.scannedFiles ?? 0;
+
+      // Check 12: legacy prompt references
+      if (legacyHits.length === 0) {
+        checks.push({
+          id: "check-12",
+          label: "12. Prompt filename hygiene",
+          status: "pass",
+          detail: `Scanned ${scanned} source files. No legacy prompt filename references found.`,
+        });
+      } else {
+        const locations = legacyHits
+          .map((h) => `${h.file}:${h.line} (${h.match})`)
+          .join("; ");
+        checks.push({
+          id: "check-12",
+          label: "12. Prompt filename hygiene",
+          status: "fail",
+          detail: `FAIL: Legacy prompt references found in: ${locations}. See FIXES.md #12.`,
+        });
+      }
+
+      // Check 13: mixed bridge imports
+      if (mixedHits.length === 0) {
+        checks.push({
+          id: "check-13",
+          label: "13. No mixed bridge imports",
+          status: "pass",
+          detail: `Scanned ${scanned} source files. No starter/finisher bridge imports found.`,
+        });
+      } else {
+        const locations = mixedHits
+          .map((h) => `${h.file}:${h.line} (${h.match})`)
+          .join("; ");
+        checks.push({
+          id: "check-13",
+          label: "13. No mixed bridge imports",
+          status: "fail",
+          detail: `FAIL: Mixed bridge references found in: ${locations}. See FIXES.md #13.`,
+        });
+      }
+    } catch {
       checks.push({
         id: "check-12",
         label: "12. Prompt filename hygiene",
-        status: "pass",
-        detail:
-          "Runtime OK. Manually verify no legacy prompt filename references or naming drift in app source files. See FIXES.md #12.",
+        status: "warn",
+        detail: "Could not reach /api/scan-source. Ensure the route exists. See FIXES.md #12.",
       });
-    }
-
-    // ---------------------------------------------------------------
-    // 13) Mixed bridge module check
-    // ---------------------------------------------------------------
-    {
       checks.push({
         id: "check-13",
         label: "13. No mixed bridge imports",
-        status: "pass",
-        detail:
-          "App uses single bridge entry at lib/bridge-entry.ts. Verify no starter/finisher mixing in app imports. See FIXES.md #13.",
+        status: "warn",
+        detail: "Could not reach /api/scan-source. Ensure the route exists. See FIXES.md #13.",
       });
     }
 
