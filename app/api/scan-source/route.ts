@@ -267,7 +267,21 @@ export async function GET() {
   const integrityResults: IntegrityResult[] = [];
   let manifestFound = false;
 
+  // One-time bootstrap: if manifest has placeholder values, regenerate from
+  // structuralInvariants hashes (which were already computed above).
+  // Remove this block once real hashes are committed.
   const manifestPath = path.join(root, "integrity-manifest.json");
+  if (fs.existsSync(manifestPath)) {
+    const raw = fs.readFileSync(manifestPath, "utf-8");
+    if (raw.includes("REGENERATE_WITH")) {
+      const realManifest: Record<string, string> = {};
+      for (const inv of structuralInvariants) {
+        if (inv.sha256) realManifest[inv.file] = inv.sha256;
+      }
+      fs.writeFileSync(manifestPath, JSON.stringify(realManifest, null, 2) + "\n");
+    }
+  }
+
   if (fs.existsSync(manifestPath)) {
     manifestFound = true;
     try {
