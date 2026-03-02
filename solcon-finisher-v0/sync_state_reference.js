@@ -1,12 +1,14 @@
 // Golden reference sync reducer for SolCon web apps.
 // Import this pattern and adapt renderUser/setUser to your app.
 
-const DEFAULT_LOCK_MS = 3000;
+const DEFAULT_LOCK_MS = 300;
 
 export function createSyncStateMachine({
-  initialUserId = "n1",
+  initialUserId = "",
   manualLockMs = DEFAULT_LOCK_MS,
   renderUser,
+  // setUser is the sole owner of identity writes.
+  // Do not call braze.changeUser/openSession outside this callback path.
   setUser
 }) {
   if (typeof renderUser !== "function") {
@@ -17,7 +19,7 @@ export function createSyncStateMachine({
   }
 
   const state = {
-    activeUserId: normalizeUserId(initialUserId) || "n1",
+    activeUserId: normalizeUserId(initialUserId),
     lastAppliedSig: "",
     lastManualAt: 0
   };
@@ -67,5 +69,5 @@ export function createSyncStateMachine({
 }
 
 function normalizeUserId(raw) {
-  return String(raw ?? "").trim().toLowerCase();
+  return String(raw ?? "").trim();
 }

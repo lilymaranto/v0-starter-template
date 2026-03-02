@@ -2,9 +2,9 @@
 // Callers import { startWebSession, setUser, listenForNative } from this file.
 // Do not call DemoBridge.* elsewhere; keep changeUser routing single-threaded.
 //
-// AI/V0 hint: Wherever you call startWebSession/setUser, also call braze.changeUser(userId) then braze.openSession()
-// (for the Braze Web SDK) so SDK analytics match the session traffic we emit. Keep those calls centralized here or
-// in a single wrapper to avoid scattered changeUser calls.
+// AI/V0 hint: braze.changeUser/openSession must be called only in the single setUser
+// callback path used by createSyncStateMachine. Do not call them directly from
+// providers/components/listeners. Do not issue multiple bridge startSession calls for one identity action.
 
 let warnedMissingBridge = false;
 
@@ -18,6 +18,10 @@ const hasBridge = () => {
 };
 
 let currentConfigId = null;
+
+export function setCurrentConfigId(configId) {
+  currentConfigId = configId ?? null;
+}
 
 export function startWebSession({ userId, configId }) {
   currentConfigId = configId;
@@ -37,12 +41,11 @@ export function setUser(userId, reason = "manual") {
 
 export function listenForNative(changeUserFn) {
   if (typeof changeUserFn !== "function") {
-    throw new Error("listenForNative requires changeUserFn(userId)");
+    throw new Error("listenForNative requires changeUserFn(userId, detail)");
   }
   if (!hasBridge() || !window.DemoBridge?.initNativeListener) return;
   window.DemoBridge.initNativeListener((incomingUserId, detail) => {
     if (!incomingUserId) return;
-    changeUserFn(incomingUserId);
-    // Optional: log or surface detail.reason / detail.sessionId / detail.configId
+    changeUserFn(incomingUserId, detail);
   });
 }

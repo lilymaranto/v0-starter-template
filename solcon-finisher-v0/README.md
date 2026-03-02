@@ -1,4 +1,4 @@
-## SolCon Finisher v0 (New)
+## SolCon Finisher v0
 
 This is a clean copy of the finisher pack for v0-focused hardening.
 
@@ -8,4 +8,4 @@ Use this after product/UI flow is already built:
 - Harden identity/session sync and custom-event forwarding.
 
 Primary prompt:
-- `SOLCON_PROMPT_V0_NEW.md`
+- `SOLCON_PROMPT_V0.md`

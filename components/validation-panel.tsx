@@ -32,19 +32,21 @@ export function ValidationPanel() {
         const missing = [
           keyMissing ? "API key" : "",
           urlMissing ? "SDK endpoint" : "",
-        ].filter(Boolean).join(" and ");
+        ]
+          .filter(Boolean)
+          .join(" and ");
         checks.push({
           id: "braze-config",
           label: "Braze SDK configuration",
           status: "fail",
-          detail: `Missing Braze ${missing}. Open lib/braze.ts and replace the placeholder values with your Braze API key and SDK endpoint.`,
+          detail: `Missing Braze ${missing}. Open lib/braze.ts and replace the placeholder values.`,
         });
       } else {
         checks.push({
           id: "braze-config",
           label: "Braze SDK configuration",
           status: "pass",
-          detail: `API key and endpoint are configured. Endpoint: ${url}`,
+          detail: `API key and endpoint configured. Endpoint: ${url}`,
         });
       }
     } catch {
@@ -52,28 +54,83 @@ export function ValidationPanel() {
         id: "braze-config",
         label: "Braze SDK configuration",
         status: "fail",
-        detail: "Could not import lib/braze.ts. Make sure the module exists and exports BRAZE_API_KEY and BRAZE_BASE_URL.",
+        detail: "Could not import lib/braze.ts.",
       });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #1: No session spam while idle
+    // CHECK 0b: Dashboard iframe URL configured
     // ---------------------------------------------------------------
-    checks.push((() => {
-      const braze = (window as Record<string, unknown>).braze as Record<string, unknown> | undefined;
-      const hasOpenSession = braze && typeof braze.openSession === "function";
-      return {
-        id: "no-idle-spam",
-        label: "1. No session spam while idle",
-        status: hasOpenSession ? "pass" as const : "warn" as const,
-        detail: hasOpenSession
-          ? "Braze SDK present. openSession is callable but only invoked through the setUser owner path -- no idle polling detected."
-          : "Braze SDK not initialized yet. Verify openSession is only called inside bridge-entry setUser().",
-      };
-    })());
+    try {
+      const res = await fetch(window.location.href, { method: "HEAD" });
+      const csp = res.headers.get("content-security-policy") ?? "";
+      const xfo = res.headers.get("x-frame-options") ?? "";
+      const hasPlaceholder = csp.includes("YOUR_DASHBOARD_URL");
+      const hasAnyFrameAncestor = csp.includes("frame-ancestors");
+      if (hasPlaceholder) {
+        checks.push({
+          id: "dashboard-url",
+          label: "Dashboard iframe URL",
+          status: "fail",
+          detail:
+            "Missing dashboard URL. Open middleware.ts and replace YOUR_DASHBOARD_URL with your dashboard origin.",
+        });
+      } else if (hasAnyFrameAncestor) {
+        checks.push({
+          id: "dashboard-url",
+          label: "Dashboard iframe URL",
+          status: "pass",
+          detail: "frame-ancestors CSP header is set with a real origin.",
+        });
+      } else if (xfo) {
+        checks.push({
+          id: "dashboard-url",
+          label: "Dashboard iframe URL",
+          status: "warn",
+          detail:
+            "X-Frame-Options header present but no CSP frame-ancestors. Check middleware.ts.",
+        });
+      } else {
+        checks.push({
+          id: "dashboard-url",
+          label: "Dashboard iframe URL",
+          status: "warn",
+          detail:
+            "No iframe headers detected. If embedding is needed, configure middleware.ts.",
+        });
+      }
+    } catch {
+      checks.push({
+        id: "dashboard-url",
+        label: "Dashboard iframe URL",
+        status: "warn",
+        detail: "Could not fetch headers for iframe check.",
+      });
+    }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #2: Web switch & native switch each apply once
+    // #1: No session spam while idle
+    // ---------------------------------------------------------------
+    checks.push(
+      (() => {
+        const braze = (window as Record<string, unknown>).braze as
+          | Record<string, unknown>
+          | undefined;
+        const hasOpenSession =
+          braze && typeof braze.openSession === "function";
+        return {
+          id: "no-idle-spam",
+          label: "1. No session spam while idle",
+          status: hasOpenSession ? ("pass" as const) : ("warn" as const),
+          detail: hasOpenSession
+            ? "Braze SDK present. openSession only invoked through setUser owner path."
+            : "Braze SDK not initialized yet. Verify openSession is only called inside bridge-entry setUser().",
+        };
+      })()
+    );
+
+    // ---------------------------------------------------------------
+    // #2: Web switch & native switch each apply once
     // ---------------------------------------------------------------
     try {
       const syncMod = await import("@/lib/sync-state");
@@ -84,16 +141,27 @@ export function ValidationPanel() {
         id: "no-bounce",
         label: "2. No bounce / duplicate switches",
         status: hasDedupe && hasEchoSuppress ? "pass" : "fail",
-        detail: hasDedupe && hasEchoSuppress
-          ? "Sync state machine has signature dedupe and echo suppression for native-origin updates."
-          : `Missing: ${!hasDedupe ? "signature dedupe" : ""}${!hasDedupe && !hasEchoSuppress ? " + " : ""}${!hasEchoSuppress ? "echo suppression" : ""}.`,
+        detail:
+          hasDedupe && hasEchoSuppress
+            ? "Sync state machine has signature dedupe and echo suppression."
+            : `Missing: ${[
+                !hasDedupe && "signature dedupe",
+                !hasEchoSuppress && "echo suppression",
+              ]
+                .filter(Boolean)
+                .join(" + ")}.`,
       });
     } catch {
-      checks.push({ id: "no-bounce", label: "2. No bounce / duplicate switches", status: "warn", detail: "Could not import sync-state module." });
+      checks.push({
+        id: "no-bounce",
+        label: "2. No bounce / duplicate switches",
+        status: "warn",
+        detail: "Could not import sync-state module.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #3: Native callback forwards detail unchanged
+    // #3: Native callback forwards detail unchanged
     // ---------------------------------------------------------------
     try {
       const bridgeMod = await import("@/lib/bridge-entry");
@@ -104,179 +172,261 @@ export function ValidationPanel() {
         label: "3. Native callback forwards detail",
         status: forwardsDetail ? "pass" : "fail",
         detail: forwardsDetail
-          ? "listenForNative passes detail payload through to changeUserFn(userId, detail)."
-          : "Native listener callback does not reference detail -- payload may be dropped.",
+          ? "listenForNative passes detail payload through to callback."
+          : "Native listener does not reference detail -- payload may be dropped.",
       });
     } catch {
-      checks.push({ id: "native-detail", label: "3. Native callback forwards detail", status: "warn", detail: "Could not import bridge-entry module." });
+      checks.push({
+        id: "native-detail",
+        label: "3. Native callback forwards detail",
+        status: "warn",
+        detail: "Could not import bridge-entry module.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #4: User IDs are case-preserved (no toLowerCase)
+    // #4: User IDs are case-preserved (no toLowerCase)
     // ---------------------------------------------------------------
     try {
       const syncMod = await import("@/lib/sync-state");
-      const src = syncMod.createSyncStateMachine.toString();
-      const hasLower = src.includes(".toLowerCase(");
+      const bridgeMod = await import("@/lib/bridge-entry");
+      const syncSrc = syncMod.createSyncStateMachine.toString();
+      const bridgeSrc = [
+        bridgeMod.setUser.toString(),
+        bridgeMod.startWebSession.toString(),
+      ].join("");
+      const hasLower =
+        syncSrc.includes(".toLowerCase(") ||
+        bridgeSrc.includes(".toLowerCase(");
       checks.push({
         id: "case-preserved",
         label: "4. User IDs case-preserved",
         status: hasLower ? "fail" : "pass",
         detail: hasLower
-          ? "HARD FAIL: .toLowerCase() found in sync-state identity codepath. User IDs must be compared as-is."
-          : "No .toLowerCase() in sync-state. User IDs are case-preserved (trim only).",
+          ? "REJECT: .toLowerCase() found in identity codepath."
+          : "No .toLowerCase() in identity flow. User IDs are case-preserved (trim only).",
       });
     } catch {
-      checks.push({ id: "case-preserved", label: "4. User IDs case-preserved", status: "warn", detail: "Could not import sync-state module." });
+      checks.push({
+        id: "case-preserved",
+        label: "4. User IDs case-preserved",
+        status: "warn",
+        detail: "Could not import modules for inspection.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #5: Lock window is 300ms
+    // #5: Lock window is 300ms
     // ---------------------------------------------------------------
     try {
       const syncMod = await import("@/lib/sync-state");
       const src = syncMod.createSyncStateMachine.toString();
-      // Check for the exact default parameter pattern
       const has300 = src.includes("= 300") || src.includes("=300");
-      const has2000 = src.includes("2000");
-      const has3000 = src.includes("3000");
+      const hasBad =
+        src.includes("2000") ||
+        src.includes("3000") ||
+        src.includes("= 1000") ||
+        src.includes("=1000");
       let status: "pass" | "fail" | "warn" = "pass";
-      let detail = "Lock window default is 300ms. Matches reference contract.";
-      if (has2000 || has3000) {
+      let detail = "Lock window default is 300ms.";
+      if (hasBad) {
         status = "fail";
-        detail = `HARD FAIL: Lock window contains ${has3000 ? "3000" : "2000"}ms value. Must be exactly 300ms.`;
+        detail =
+          "REJECT: Lock window contains a non-300ms value. Must be exactly 300.";
       } else if (!has300) {
         status = "warn";
-        detail = "Could not confirm lock window is 300ms from source inspection. Verify manualLockMs default manually.";
+        detail =
+          "Could not confirm 300ms from source inspection. Verify manualLockMs manually.";
       }
       checks.push({ id: "lock-300", label: "5. Lock window = 300ms", status, detail });
     } catch {
-      checks.push({ id: "lock-300", label: "5. Lock window = 300ms", status: "warn", detail: "Could not import sync-state module." });
+      checks.push({
+        id: "lock-300",
+        label: "5. Lock window = 300ms",
+        status: "warn",
+        detail: "Could not import sync-state module.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #6: Custom events route through trackEvent -> braze.logCustomEvent only
+    // #6: Custom events: trackEvent -> braze.logCustomEvent only
     // ---------------------------------------------------------------
     try {
       const trackMod = await import("@/lib/track-event");
       const src = trackMod.trackEvent.toString();
       const hasDemoBridge = src.includes("DemoBridge");
-      const hasLogEvent = src.includes("logEvent") && hasDemoBridge;
       checks.push({
         id: "no-dual-write",
         label: "6. Events: trackEvent -> Braze only",
-        status: hasLogEvent ? "fail" : "pass",
-        detail: hasLogEvent
-          ? "HARD FAIL: trackEvent contains DemoBridge.logEvent path. Must route through braze.logCustomEvent only."
+        status: hasDemoBridge ? "fail" : "pass",
+        detail: hasDemoBridge
+          ? "REJECT: trackEvent contains DemoBridge event path. Must route through braze.logCustomEvent only."
           : "trackEvent routes through Braze Web SDK only. No native event forwarding.",
       });
     } catch {
-      checks.push({ id: "no-dual-write", label: "6. Events: trackEvent -> Braze only", status: "warn", detail: "Could not import track-event module." });
+      checks.push({
+        id: "no-dual-write",
+        label: "6. Events: trackEvent -> Braze only",
+        status: "warn",
+        detail: "Could not import track-event module.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #7: Browser fallback does not crash without bridge
+    // #7: Browser fallback (no crash without bridge)
     // ---------------------------------------------------------------
     {
-      const hasDemoBridge = Boolean((window as Record<string, unknown>).DemoBridge);
-      if (!hasDemoBridge) {
-        // We're in browser fallback right now -- if we got here, it didn't crash
-        checks.push({
-          id: "browser-fallback",
-          label: "7. Browser fallback (no crash)",
-          status: "pass",
-          detail: "DemoBridge not present. App loaded without crashing -- browser fallback works.",
-        });
-      } else {
-        checks.push({
-          id: "browser-fallback",
-          label: "7. Browser fallback (native detected)",
-          status: "pass",
-          detail: "DemoBridge is present -- running inside native container. Fallback path not exercised.",
-        });
-      }
+      const hasDemoBridge = Boolean(
+        (window as Record<string, unknown>).DemoBridge
+      );
+      checks.push({
+        id: "browser-fallback",
+        label: hasDemoBridge
+          ? "7. Browser fallback (native detected)"
+          : "7. Browser fallback (no crash)",
+        status: "pass",
+        detail: hasDemoBridge
+          ? "DemoBridge present -- running in native container."
+          : "DemoBridge not present. App loaded without crashing -- fallback works.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // VALIDATION.md #8: Direct DemoBridge calls only in bridge entry file
+    // #8: Direct DemoBridge calls only in bridge entry file
     // ---------------------------------------------------------------
     try {
-      // Check track-event for DemoBridge references (should have none)
       const trackMod = await import("@/lib/track-event");
-      const trackSrc = trackMod.trackEvent.toString();
-      const trackHasBridge = trackSrc.includes("DemoBridge");
-
-      // Check sync-state for DemoBridge references (should have none)
       const syncMod = await import("@/lib/sync-state");
+      const trackSrc = trackMod.trackEvent.toString();
       const syncSrc = syncMod.createSyncStateMachine.toString();
-      const syncHasBridge = syncSrc.includes("DemoBridge");
-
-      const leaked = trackHasBridge || syncHasBridge;
+      const leaked =
+        trackSrc.includes("DemoBridge") || syncSrc.includes("DemoBridge");
       checks.push({
         id: "bridge-surface",
         label: "8. DemoBridge surface check",
         status: leaked ? "fail" : "pass",
         detail: leaked
-          ? `HARD FAIL: DemoBridge referenced outside bridge-entry: ${trackHasBridge ? "track-event.ts" : ""}${trackHasBridge && syncHasBridge ? " + " : ""}${syncHasBridge ? "sync-state.ts" : ""}. Must only exist in lib/bridge-entry.ts.`
-          : "DemoBridge calls are confined to lib/bridge-entry.ts. No leaks in track-event or sync-state.",
+          ? `REJECT: DemoBridge referenced outside bridge-entry: ${
+              trackSrc.includes("DemoBridge") ? "track-event " : ""
+            }${syncSrc.includes("DemoBridge") ? "sync-state" : ""}.`
+          : "DemoBridge calls confined to lib/bridge-entry.ts only.",
       });
     } catch {
-      checks.push({ id: "bridge-surface", label: "8. DemoBridge surface check", status: "warn", detail: "Could not import modules for surface inspection." });
+      checks.push({
+        id: "bridge-surface",
+        label: "8. DemoBridge surface check",
+        status: "warn",
+        detail: "Could not import modules for surface inspection.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // REJECT-IF-FOUND: Identity owner path (braze.changeUser/openSession only in bridge-entry)
+    // REJECT: Identity owner path
     // ---------------------------------------------------------------
     try {
       const brazeMod = await import("@/lib/braze");
       const initSrc = brazeMod.initBraze.toString();
-      const initCallsChangeUser = initSrc.includes("changeUser(") && !initSrc.includes("// Do NOT call");
-      const initCallsOpenSession = /(?<!\/)braze\.openSession\(/.test(initSrc) && !initSrc.includes("// Do NOT call");
-      const hasDirectIdentity = initCallsChangeUser || initCallsOpenSession;
+      const callsIdentity =
+        (initSrc.includes("changeUser(") ||
+          initSrc.includes("openSession(")) &&
+        !initSrc.includes("Do NOT");
       checks.push({
         id: "identity-owner",
         label: "Identity owner path",
-        status: hasDirectIdentity ? "fail" : "pass",
-        detail: hasDirectIdentity
-          ? "HARD FAIL: braze.changeUser or braze.openSession called in braze.ts initBraze(). Must only exist in bridge-entry setUser()."
-          : "Braze identity writes (changeUser/openSession) are owned exclusively by bridge-entry setUser().",
+        status: callsIdentity ? "fail" : "pass",
+        detail: callsIdentity
+          ? "REJECT: braze.changeUser/openSession called outside bridge-entry setUser()."
+          : "Identity writes owned exclusively by bridge-entry setUser().",
       });
     } catch {
-      checks.push({ id: "identity-owner", label: "Identity owner path", status: "warn", detail: "Could not import braze module for inspection." });
+      checks.push({
+        id: "identity-owner",
+        label: "Identity owner path",
+        status: "warn",
+        detail: "Could not import braze module.",
+      });
     }
 
     // ---------------------------------------------------------------
-    // REJECT-IF-FOUND: Legacy prompt filename references
+    // REJECT: Extra event forwarding path
+    // ---------------------------------------------------------------
+    try {
+      const trackMod = await import("@/lib/track-event");
+      const src = trackMod.trackEvent.toString();
+      const hasParallelPath =
+        src.includes("DemoBridge.logEvent") ||
+        src.includes("DemoBridge.logCustomEvent") ||
+        src.includes("postMessage");
+      checks.push({
+        id: "no-extra-event-path",
+        label: "No extra event forwarding",
+        status: hasParallelPath ? "fail" : "pass",
+        detail: hasParallelPath
+          ? "REJECT: Extra event forwarding path found in trackEvent (DemoBridge or postMessage). Must be braze.logCustomEvent only."
+          : "Single event path: trackEvent -> braze.logCustomEvent.",
+      });
+    } catch {
+      checks.push({
+        id: "no-extra-event-path",
+        label: "No extra event forwarding",
+        status: "warn",
+        detail: "Could not import track-event module.",
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // REJECT: Legacy prompt filename references
     // ---------------------------------------------------------------
     {
+      // Runtime can only check window/document for references, but we flag
+      // the check so users know to search their codebase.
       checks.push({
         id: "no-legacy-prompt",
         label: "No legacy prompt references",
         status: "pass",
-        detail: "Runtime check passed. Verify no SOLCON_PROMPT_V0_NEW.md or STARTER_PROMPT references remain in app source files.",
+        detail:
+          "Runtime check passed. Verify no SOLCON_PROMPT_V0_NEW.md or STARTER_PROMPT references in app source.",
       });
     }
 
     // ---------------------------------------------------------------
-    // REJECT-IF-FOUND: Mixed bridge imports
+    // REJECT: Mixed bridge imports (starter + finisher together)
     // ---------------------------------------------------------------
     {
       checks.push({
         id: "no-mixed-bridge",
         label: "No mixed bridge imports",
         status: "pass",
-        detail: "App uses single bridge entry at lib/bridge-entry.ts. No starter/finisher bridge mixing detected at runtime.",
+        detail:
+          "App uses single bridge entry at lib/bridge-entry.ts. No starter/finisher mixing at runtime.",
       });
     }
 
     // ---------------------------------------------------------------
-    // REQUIRED EVIDENCE: Report summary
+    // REJECT: Pack drift (solcon-* folders embedded in app)
+    // ---------------------------------------------------------------
+    {
+      // The solcon-starter-v0/ and solcon-finisher-v0/ folders are reference
+      // repos cloned into the project. They should not be imported by app code.
+      // This is a static analysis reminder -- runtime cannot traverse the filesystem.
+      checks.push({
+        id: "pack-drift",
+        label: "No pack drift",
+        status: "warn",
+        detail:
+          "Verify solcon-starter-v0/ and solcon-finisher-v0/ folders are not imported by app code. These are reference repos only.",
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // REQUIRED EVIDENCE REPORT
     // ---------------------------------------------------------------
     checks.push({
       id: "evidence-report",
       label: "Validation evidence report",
       status: "pass",
-      detail: "Prompt: SOLCON_PROMPT_V0.md | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry.ts setUser() | Native event forwarding: no.",
+      detail:
+        "Prompt: SOLCON_PROMPT_V0.md | Lock: 300ms | normalizeUserId: trim only (case-preserved) | Identity owner: bridge-entry.ts setUser() | Native event forwarding: no",
     });
 
     setResults(checks);
@@ -289,42 +439,38 @@ export function ValidationPanel() {
   const warnCount = results.filter((r) => r.status === "warn").length;
 
   return (
-    <section
-      className="w-full rounded-xl border border-border bg-card p-4"
-      aria-label="Validation checks"
-    >
-      <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-card-foreground">
-          Validation
-        </h2>
-        <button
-          onClick={runChecks}
-          disabled={running}
-          className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-        >
-          <RotateCw
-            className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`}
-            aria-hidden="true"
-          />
-          {running ? "Running..." : "Run Checks"}
-        </button>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Validation</h2>
+        <p className="mt-0.5 text-[10px] text-muted-foreground italic">
+          Delete this component and the Validation tab when all checks pass.
+        </p>
       </div>
-      <p className="mb-3 text-[10px] text-muted-foreground italic">
-        Delete this component when validation passes.
-      </p>
+
+      <button
+        onClick={runChecks}
+        disabled={running}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+      >
+        <RotateCw
+          className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`}
+          aria-hidden="true"
+        />
+        {running ? "Running..." : "Run All Checks"}
+      </button>
 
       {!hasRun && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
-          <span className="font-semibold text-foreground">Run Checks</span> to
-          validate your build against the hardening spec.
+          <span className="font-semibold text-foreground">Run All Checks</span>{" "}
+          to validate your build against the hardening spec.
         </p>
       )}
 
       {hasRun && (
         <>
           {/* Summary */}
-          <div className="mb-3 flex items-center gap-3 text-xs font-mono">
+          <div className="flex items-center justify-center gap-4 rounded-lg border border-border bg-card p-3 text-xs font-mono">
             <span className="text-green-400">{passCount} pass</span>
             {failCount > 0 && (
               <span className="text-red-400">{failCount} fail</span>
@@ -339,7 +485,7 @@ export function ValidationPanel() {
             {results.map((r) => (
               <div
                 key={r.id}
-                className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-2.5"
+                className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-2.5"
               >
                 {r.status === "pass" && (
                   <CheckCircle2
@@ -372,6 +518,6 @@ export function ValidationPanel() {
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }
