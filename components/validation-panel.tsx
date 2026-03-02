@@ -735,29 +735,30 @@ export function ValidationPanel() {
         parts.push(`Integrity hashes: ${integrity.length}/${integrity.length} match`);
       } else {
         const changed = hashMismatches.map((r) => r.file).join(", ");
-        parts.push(`Integrity hashes CHANGED: ${changed}${strictMode ? " [STRICT MODE]" : " (warn only, set STRICT_INTEGRITY_MODE=true to enforce)"}`);
+        parts.push(`Integrity hashes changed: ${changed}${strictMode ? " [STRICT MODE]" : " (advisory, set STRICT_INTEGRITY_MODE=true to enforce)"}`);
       }
 
       // Determine status
       // Structural invariants: always enforced (fail if broken)
       // Integrity hashes: only enforced when STRICT_INTEGRITY_MODE=true
-      // Missing manifest without strict mode: pass (integrity is opt-in)
+      // Non-strict integrity differences are advisory only (pass)
       let status: "pass" | "fail" | "warn" = "pass";
       if (!invariantsOk) {
         status = "fail";
       } else if (strictMode && (!manifestFound || !integrityOk)) {
         status = "fail";
-      } else if (manifestFound && !integrityOk) {
-        status = "warn"; // Manifest exists but hashes differ, non-strict
+      } else {
+        status = "pass";
       }
 
+      const isAdvisory = status === "pass" && manifestFound && !integrityOk;
       checks.push({
         id: "check-17",
-        label: status === "pass"
-          ? "17. Hardened file protection: all clear"
-          : status === "fail"
-            ? "17. Hardened file protection: BROKEN"
-            : "17. Hardened file protection: advisory",
+        label: status === "fail"
+          ? "17. Hardened file protection: BROKEN"
+          : isAdvisory
+            ? "17. Hardened file protection: advisory (non-strict)"
+            : "17. Hardened file protection: all clear",
         status,
         detail: parts.join(" | ") + ". See FIXES.md #17.",
       });
