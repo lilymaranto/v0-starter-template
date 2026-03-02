@@ -218,6 +218,7 @@ export async function GET() {
         file: entry.rel,
         present: [],
         missing: ["FILE MISSING"],
+        sha256: "",
       });
       continue;
     }

@@ -117,7 +117,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Why it exists:** Intended policy (Check 7) may be correct while actual observed headers differ due to middleware/proxy/CDN injection.
 - **Failure means:** Real observed CSP on a same-origin fetch to "/" does not include required origin, or observed X-Frame-Options is DENY/SAMEORIGIN which blocks embedding.
 - **Environment behavior:**
-  - Non-production/preview (v0.dev, vusercontent.net, localhost): missing observed CSP is WARN, not FAIL, because middleware intentionally omits frame-ancestors to allow preview iframe embedding.
+  - Non-production/preview (v0.dev, vusercontent.net, localhost): missing observed CSP is PASS (preview/local exempt), because middleware intentionally omits frame-ancestors to allow preview iframe embedding.
   - Production-like: missing observed CSP for required origin is FAIL.
   - XFO conflict (DENY/SAMEORIGIN) is always FAIL regardless of environment.
 - **Fix:** Ensure headers are consistent for embed routes:
