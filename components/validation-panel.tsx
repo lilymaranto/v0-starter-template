@@ -122,11 +122,11 @@ export function ValidationPanel() {
         detail: allPass
           ? "Echo suppression active and listenForNative forwards detail payload unchanged."
           : `Missing: ${[
-              !hasEchoSuppress && "echo suppression (fromNative)",
-              !forwardsDetail && "detail forwarding in listenForNative",
-            ]
-              .filter(Boolean)
-              .join(", ")}.`,
+            !hasEchoSuppress && "echo suppression (fromNative)",
+            !forwardsDetail && "detail forwarding in listenForNative",
+          ]
+            .filter(Boolean)
+            .join(", ")}.`,
       });
     } catch {
       checks.push({
@@ -197,9 +197,8 @@ export function ValidationPanel() {
         label: "6. Surface check: DemoBridge confined",
         status: leaked ? "fail" : "pass",
         detail: leaked
-          ? `REJECT: DemoBridge referenced outside bridge-entry: ${
-              trackSrc.includes("DemoBridge") ? "track-event " : ""
-            }${syncSrc.includes("DemoBridge") ? "sync-state" : ""}.`
+          ? `REJECT: DemoBridge referenced outside bridge-entry: ${trackSrc.includes("DemoBridge") ? "track-event " : ""
+          }${syncSrc.includes("DemoBridge") ? "sync-state" : ""}.`
           : "DemoBridge calls confined to lib/bridge-entry.ts only.",
       });
     } catch {
@@ -213,14 +212,16 @@ export function ValidationPanel() {
 
     // ---------------------------------------------------------------
     // 7) Iframe check — doppel dashboard URL in frame-ancestors
-    //    Hits /api/check-csp which echoes the CSP header back
+    //    Hits /api/check-csp which returns { csp } in JSON body
+    //    (browsers strip CSP from fetch response headers)
     // ---------------------------------------------------------------
     {
       const REQUIRED_ORIGIN =
         "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com";
       try {
         const res = await fetch("/api/check-csp");
-        const csp = res.headers.get("content-security-policy") ?? "";
+        const body = await res.json();
+        const csp: string = body.csp ?? "";
         const hasFrameAncestors = csp.includes("frame-ancestors");
         const hasDoppel = csp.includes(REQUIRED_ORIGIN);
         if (hasFrameAncestors && hasDoppel) {
@@ -240,10 +241,10 @@ export function ValidationPanel() {
         } else {
           checks.push({
             id: "check-7",
-            label: "7. Iframe: no CSP header",
+            label: "7. Iframe: no CSP value",
             status: "fail",
             detail:
-              "No frame-ancestors CSP header detected. The middleware and /api/check-csp route must set it.",
+              "No frame-ancestors CSP value returned from /api/check-csp. Ensure the route sets the csp field.",
           });
         }
       } catch {
@@ -390,16 +391,14 @@ export function ValidationPanel() {
       });
     }
 
-    // ---------------------------------------------------------------
-    // 12) Prompt filename hygiene — no _NEW references
-    // ---------------------------------------------------------------
+
     {
       checks.push({
         id: "check-12",
         label: "12. Prompt filename hygiene",
         status: "pass",
         detail:
-          "Runtime OK. Manually verify no SOLCON_PROMPT_V0_NEW.md or STARTER_PROMPT references in app source files.",
+          "Runtime OK. Manually verify no SOLCON_PROMPT_V0.md or STARTER_PROMPT references in app source files.",
       });
     }
 
