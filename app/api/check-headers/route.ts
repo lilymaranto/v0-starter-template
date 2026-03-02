@@ -33,11 +33,19 @@ export async function GET() {
     const observedCsp = res.headers.get("content-security-policy") ?? "";
     const observedXFrameOptions = res.headers.get("x-frame-options") ?? "";
 
+    const isProductionLike =
+      process.env.NODE_ENV === "production" &&
+      !host.includes("vusercontent.net") &&
+      !host.includes("v0.dev") &&
+      !host.includes("localhost");
+
     return NextResponse.json({
       intendedCsp,
       allowedParents: ALLOWED_IFRAME_PARENTS,
       observedCsp,
       observedXFrameOptions: observedXFrameOptions || null,
+      isProductionLike,
+      host,
     });
   } catch (err) {
     return NextResponse.json(

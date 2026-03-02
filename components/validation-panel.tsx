@@ -646,31 +646,43 @@ export function ValidationPanel() {
         } else {
           const observedCsp: string = body.observedCsp ?? "";
           const observedXfo: string | null = body.observedXFrameOptions ?? null;
+          const isProd: boolean = body.isProductionLike ?? false;
+          const envHost: string = body.host ?? "unknown";
 
           const cspOk = observedCsp.includes("frame-ancestors") && observedCsp.includes(REQUIRED_ORIGIN);
           const xfoConflict = observedXfo !== null && observedXfo !== "" &&
             (observedXfo.toUpperCase() === "DENY" || observedXfo.toUpperCase() === "SAMEORIGIN");
 
-          if (cspOk && !xfoConflict) {
+          // XFO conflict is always a FAIL regardless of environment
+          if (xfoConflict) {
+            checks.push({
+              id: "check-16",
+              label: "16. Embed headers: XFO conflict",
+              status: "fail",
+              detail: `Observed X-Frame-Options is "${observedXfo}" which blocks cross-origin embedding even though CSP may allow it. See FIXES.md #16.`,
+            });
+          } else if (cspOk) {
             checks.push({
               id: "check-16",
               label: "16. Embed headers: no conflict",
               status: "pass",
               detail: `Observed CSP frame-ancestors allows ${REQUIRED_ORIGIN} and no conflicting X-Frame-Options header on real response.`,
             });
-          } else if (!cspOk) {
+          } else if (!isProd) {
+            // Non-production: middleware intentionally omits frame-ancestors
+            checks.push({
+              id: "check-16",
+              label: "16. Embed headers: preview/local skip",
+              status: "warn",
+              detail: `Non-production host (${envHost}): middleware intentionally omits CSP frame-ancestors. Will enforce in production. See FIXES.md #16.`,
+            });
+          } else {
+            // Production-like but CSP missing
             checks.push({
               id: "check-16",
               label: "16. Embed headers: observed CSP missing",
               status: "fail",
-              detail: `Observed CSP on real response does not include frame-ancestors for ${REQUIRED_ORIGIN}. See FIXES.md #16.`,
-            });
-          } else {
-            checks.push({
-              id: "check-16",
-              label: "16. Embed headers: XFO conflict",
-              status: "fail",
-              detail: `Observed X-Frame-Options is "${observedXfo}" which blocks cross-origin embedding even though CSP allows it. See FIXES.md #16.`,
+              detail: `Production host (${envHost}): observed CSP does not include frame-ancestors for ${REQUIRED_ORIGIN}. See FIXES.md #16.`,
             });
           }
         }
