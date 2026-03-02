@@ -6,8 +6,8 @@
 let brazeInitialized = false;
 let brazeInstance: typeof import("@braze/web-sdk") | null = null;
 
-export const BRAZE_API_KEY = "7ea48369-1551-4a9e-b054-d09b40648ef1";
-export const BRAZE_BASE_URL = "sdk.iad-03.braze.com";
+export const BRAZE_API_KEY = "YOUR_BRAZE_API_KEY";
+export const BRAZE_BASE_URL = "YOUR_SDK_ENDPOINT";
 
 export async function initBraze() {
   if (brazeInitialized) return brazeInstance;

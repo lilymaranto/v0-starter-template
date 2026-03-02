@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const ALLOWED_IFRAME_PARENTS = [
-  "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com",
+  "YOUR_DASHBOARD_URL",
 ];
 
 export function middleware(request: NextRequest) {

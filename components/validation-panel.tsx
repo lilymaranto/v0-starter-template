@@ -20,6 +20,43 @@ export function ValidationPanel() {
     const checks: CheckResult[] = [];
 
     // ---------------------------------------------------------------
+    // CHECK 0: Braze SDK API key and endpoint configured
+    // ---------------------------------------------------------------
+    try {
+      const brazeMod = await import("@/lib/braze");
+      const key = brazeMod.BRAZE_API_KEY;
+      const url = brazeMod.BRAZE_BASE_URL;
+      const keyMissing = !key || key === "YOUR_BRAZE_API_KEY";
+      const urlMissing = !url || url === "YOUR_SDK_ENDPOINT";
+      if (keyMissing || urlMissing) {
+        const missing = [
+          keyMissing ? "API key" : "",
+          urlMissing ? "SDK endpoint" : "",
+        ].filter(Boolean).join(" and ");
+        checks.push({
+          id: "braze-config",
+          label: "Braze SDK configuration",
+          status: "fail",
+          detail: `Missing Braze ${missing}. Open lib/braze.ts and replace the placeholder values with your Braze API key and SDK endpoint.`,
+        });
+      } else {
+        checks.push({
+          id: "braze-config",
+          label: "Braze SDK configuration",
+          status: "pass",
+          detail: `API key and endpoint are configured. Endpoint: ${url}`,
+        });
+      }
+    } catch {
+      checks.push({
+        id: "braze-config",
+        label: "Braze SDK configuration",
+        status: "fail",
+        detail: "Could not import lib/braze.ts. Make sure the module exists and exports BRAZE_API_KEY and BRAZE_BASE_URL.",
+      });
+    }
+
+    // ---------------------------------------------------------------
     // VALIDATION.md #1: No session spam while idle
     // ---------------------------------------------------------------
     checks.push((() => {
