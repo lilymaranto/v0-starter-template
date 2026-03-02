@@ -11,7 +11,8 @@ import fs from "fs";
 import path from "path";
 
 // Run from project root: npx tsx scripts/update-integrity-manifest.ts
-const ROOT = process.cwd();
+// Or pass an explicit root:  npx tsx scripts/update-integrity-manifest.ts /path/to/project
+const ROOT = process.argv[2] || process.cwd();
 
 const HARDENED_FILES = [
   "lib/braze.ts",
