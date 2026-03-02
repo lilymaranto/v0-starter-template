@@ -131,7 +131,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Why it exists:** Prevents silent drift of the 5 critical files (braze.ts, bridge-entry.ts, sync-state.ts, track-event.ts, middleware.ts) after template fork.
 - **Two layers:**
   - **Structural invariants (always enforced):** Each hardened file is checked for required code patterns (e.g. `hasBridge()` gate, `manualLockMs`, `lastAppliedSig`, no `.toLowerCase()`, etc.) and absence of forbidden patterns (e.g. `changeUser()` in braze.ts). FAIL if any invariant is missing.
-  - **Integrity hashes (opt-in strict):** SHA-256 hashes of the 5 files are compared against `integrity-manifest.json`. WARN-only by default; set `STRICT_INTEGRITY_MODE=true` env var to enforce FAIL on mismatch.
+  - **Integrity hashes (opt-in strict):** SHA-256 hashes of the 5 files are compared against `integrity-manifest.json`. PASS with advisory label by default; set `STRICT_INTEGRITY_MODE=true` env var to enforce FAIL on mismatch.
 - **Failure means:**
   - Structural: A required pattern was removed or a forbidden pattern was introduced in a hardened file.
   - Integrity (strict mode): A hardened file was modified in any way without regenerating the manifest.

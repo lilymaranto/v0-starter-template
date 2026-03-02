@@ -257,6 +257,7 @@ export async function GET() {
     }
 
     structuralInvariants.push({ file: entry.rel, present, missing, sha256: fileHash });
+    console.log("[v0] HASH", entry.rel, fileHash);
   }
 
   // -------------------------------------------------------------------

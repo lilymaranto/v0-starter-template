@@ -18,6 +18,16 @@ export default function Home() {
   const syncRef = useRef<ReturnType<typeof createSyncStateMachine> | null>(null);
   const initialized = useRef(false);
 
+  // [v0] Temporary: log hardened file hashes for manifest generation
+  useEffect(() => {
+    fetch("/api/scan-source").then(r => r.json()).then(d => {
+      const inv = d.structuralInvariants || [];
+      const manifest: Record<string, string> = {};
+      for (const i of inv) { if (i.sha256) manifest[i.file] = i.sha256; }
+      console.log("[v0] INTEGRITY_MANIFEST", JSON.stringify(manifest));
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
