@@ -126,4 +126,4 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 
 - **Why it exists:** Forces deterministic proof instead of “looks good” claims.
 - **Failure means:** Validation output omits required proof values.
-- **Fix:** Always print prompt filename, lock value, normalize behavior, identity owner path, and event path result.
+- **Fix:** Always print lock value, normalize behavior, identity owner path, event path, and configId resolution result.
