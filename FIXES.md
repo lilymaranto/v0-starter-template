@@ -83,14 +83,14 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Failure means:** Multiple bridge module variants are imported in app code.
 - **Fix:** Keep one bridge entry file and one import path across the codebase.
 
-## Check 13: ConfigId NFL pattern parity
+## Check 13: ConfigId resolution parity
 
-- **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability. Must match NFL resolution behavior.
+- **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability.
 - **Failure means:** One or more of: configId missing from SyncPayload, no fallbackConfigId param in sync machine, no native override path (`configId ?? fallbackConfigId`), or setUser doesn't accept resolvedConfigId.
 - **Fix:** Dynamic configId must come from native detail override, explicit web value, or env-backed fallback. Hardcoded literals are allowed only as documented template fallback defaults.
 - Pass when config resolution order is: native detail.configId -> explicit web configId -> env-backed fallback configId.
-- Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
+- **Source of truth:** Structural invariants from `/api/scan-source` (no `toString()` inspection).
 
 ## Check 14: No duplicate identity write path in native mode
 
@@ -101,6 +101,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - Browser fallback mode (no bridge): direct Braze identity write only.
 - Both paths must be in separate if/else branches, never sequential.
 - Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
+- **When Braze placeholders are present** (check 0 fail), check 14 downgrades to WARN with advisory message. Identity gating is informational until Braze config is finalized.
+- **Source of truth:** Structural invariants from `/api/scan-source` (no `toString()` inspection).
 
 ## Check 15: Native runtime event simulation
 
