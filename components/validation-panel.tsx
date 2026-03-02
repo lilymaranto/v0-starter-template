@@ -182,9 +182,11 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // Fetch scan-source evidence (used by checks 6, 8, 9, 10, 11, 12)
+    // Fetch scan-source evidence (used by checks 6, 8, 9, 10, 11, 12, 17)
     // ---------------------------------------------------------------
     type Hit = { file: string; line: number; match: string };
+    type InvariantResult = { file: string; present: string[]; missing: string[] };
+    type IntegrityResult = { file: string; expected: string; actual: string; match: boolean };
     let scanData: {
       scannedFiles: number;
       mixedBridgeHits: Hit[];
@@ -193,6 +195,10 @@ export function ValidationPanel() {
       eventBridgeForwardingHits: Hit[];
       lowercaseIdentityHits: Hit[];
       lockValueHits: Hit[];
+      structuralInvariants: InvariantResult[];
+      integrityResults: IntegrityResult[];
+      integrityStrictMode: boolean;
+      integrityManifestFound: boolean;
     } | null = null;
     let scanError = false;
 
@@ -701,15 +707,69 @@ export function ValidationPanel() {
     checks.sort((a, b) => priority[a.status] - priority[b.status]);
 
     // ---------------------------------------------------------------
-    // 17) Evidence report — always last, after sort
+    // 17) Hardened file protection — structural invariants + opt-in integrity
+    //     Always rendered last (after sort).
     // ---------------------------------------------------------------
-    checks.push({
-      id: "check-17",
-      label: "17. Evidence report",
-      status: "pass",
-      detail:
-        "Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | Event path: trackEvent -> braze.logCustomEvent only | configId: native override > explicit web > fallback. See FIXES.md #17.",
-    });
+    if (scanData && !scanError) {
+      const invariants = scanData.structuralInvariants ?? [];
+      const allMissing = invariants.flatMap((inv) =>
+        inv.missing.map((m) => `${inv.file}: ${m}`)
+      );
+      const invariantsOk = allMissing.length === 0;
+
+      // Integrity hashes (opt-in strict)
+      const integrity = scanData.integrityResults ?? [];
+      const strictMode = scanData.integrityStrictMode ?? false;
+      const manifestFound = scanData.integrityManifestFound ?? false;
+      const hashMismatches = integrity.filter((r) => !r.match);
+      const integrityOk = hashMismatches.length === 0;
+
+      // Build detail string
+      const parts: string[] = [];
+
+      if (invariantsOk) {
+        parts.push(`Structural invariants: all ${invariants.length} hardened files pass`);
+      } else {
+        parts.push(`Structural invariants BROKEN: ${allMissing.join("; ")}`);
+      }
+
+      if (!manifestFound) {
+        parts.push("Integrity manifest: not found (run scripts/update-integrity-manifest.ts)");
+      } else if (integrityOk) {
+        parts.push(`Integrity hashes: ${integrity.length}/${integrity.length} match`);
+      } else {
+        const changed = hashMismatches.map((r) => r.file).join(", ");
+        parts.push(`Integrity hashes CHANGED: ${changed}${strictMode ? " [STRICT MODE]" : " (warn only, set STRICT_INTEGRITY_MODE=true to enforce)"}`);
+      }
+
+      // Determine status
+      let status: "pass" | "fail" | "warn" = "pass";
+      if (!invariantsOk) {
+        status = "fail"; // Structural invariants always enforced
+      } else if (!integrityOk && strictMode) {
+        status = "fail"; // Hash mismatch + strict mode = fail
+      } else if (!integrityOk || !manifestFound) {
+        status = "warn"; // Hash mismatch without strict, or no manifest
+      }
+
+      checks.push({
+        id: "check-17",
+        label: status === "pass"
+          ? "17. Hardened file protection: all clear"
+          : status === "fail"
+            ? "17. Hardened file protection: BROKEN"
+            : "17. Hardened file protection: advisory",
+        status,
+        detail: parts.join(" | ") + ". See FIXES.md #17.",
+      });
+    } else {
+      checks.push({
+        id: "check-17",
+        label: "17. Hardened file protection",
+        status: "warn",
+        detail: "Could not reach /api/scan-source for invariant/integrity inspection. See FIXES.md #17.",
+      });
+    }
 
     setResults(checks);
     setRunning(false);
@@ -745,7 +805,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (17 checks).
+          to validate against the hardening spec (17 checks + structural invariants).
         </p>
       )}
 
