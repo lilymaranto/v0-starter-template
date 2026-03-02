@@ -52,10 +52,14 @@ export function startWebSession({
   window.DemoBridge.startSession({ userId, configId, reason: "default" });
 }
 
-// setUser is the SOLE OWNER of Braze identity writes.
+// setUser is the SOLE OWNER of identity writes.
 // The sync-state machine calls this as its setUser callback.
 // configId comes from the sync-state resolver (NFL pattern):
 //   native detail.configId > explicit web configId > template fallback
+//
+// Environment-gated to prevent duplicate identity writes:
+//   NATIVE MODE:  DemoBridge.startSession only (bridge handles braze internally)
+//   BROWSER MODE: braze.changeUser + openSession directly (no bridge available)
 export async function setUser(userId: string, reason = "manual", resolvedConfigId?: string) {
   if (!userId) return;
 
@@ -64,22 +68,27 @@ export async function setUser(userId: string, reason = "manual", resolvedConfigI
     currentConfigId = resolvedConfigId;
   }
 
-  // Single identity owner path: Braze changeUser + openSession
-  const braze = await getBraze();
-  if (braze) {
-    braze.changeUser(userId);
-    braze.openSession();
+  // Environment-gated: native bridge OR direct Braze, never both
+  if (hasBridge() && window.DemoBridge?.startSession) {
+    // NATIVE MODE: bridge session write only.
+    // DemoBridge.startSession already performs braze.changeUser/openSession
+    // internally inside the WKWebView container -- do NOT call them here.
+    if (currentConfigId && window.DemoBridge?.setConfigId) {
+      window.DemoBridge.setConfigId(currentConfigId);
+    }
+    window.DemoBridge.startSession({
+      userId,
+      configId: currentConfigId,
+      reason,
+    });
+  } else {
+    // BROWSER FALLBACK: direct Braze identity write (no bridge available)
+    const braze = await getBraze();
+    if (braze) {
+      braze.changeUser(userId);
+      braze.openSession();
+    }
   }
-
-  if (!hasBridge() || !window.DemoBridge?.startSession) return;
-  if (currentConfigId && window.DemoBridge?.setConfigId) {
-    window.DemoBridge.setConfigId(currentConfigId);
-  }
-  window.DemoBridge.startSession({
-    userId,
-    configId: currentConfigId,
-    reason,
-  });
 }
 
 export function listenForNative(

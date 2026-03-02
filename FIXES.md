@@ -98,6 +98,16 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 
+## Check 16: No duplicate identity write path in native mode
+
+- **Why it exists:** In WKWebView container flow, DemoBridge.startSession already performs braze.changeUser/openSession internally. Calling both directly and via bridge creates duplicate user/session writes and racey analytics.
+- **Failure means:** Both direct Braze identity writes (braze.changeUser/openSession) and DemoBridge.startSession execute in the same setUser() code path without environment gating.
+- **Fix:** Gate setUser() by environment:
+  - Native mode (window.DemoBridge.startSession available): bridge session write only, do NOT call braze.changeUser/openSession directly.
+  - Browser fallback mode (no bridge): direct Braze identity write only.
+- Both paths must be in separate if/else branches, never sequential.
+- Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
+
 ## Check 15: Evidence report
 
 - **Why it exists:** Forces deterministic proof instead of “looks good” claims.

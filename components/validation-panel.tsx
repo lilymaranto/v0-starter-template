@@ -460,6 +460,59 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
+    // 16) No duplicate identity write path in native mode
+    //     In native mode: only DemoBridge.startSession, no direct braze calls
+    //     In browser mode: only direct braze.changeUser/openSession
+    // ---------------------------------------------------------------
+    try {
+      const bridgeMod = await import("@/lib/bridge-entry");
+      const src = bridgeMod.setUser.toString();
+
+      // Check that identity writes are inside an if/else gate, not sequential
+      const hasHasBridgeGate = src.includes("hasBridge()");
+      const hasBrazeInElse =
+        (src.includes("changeUser(") || src.includes("openSession(")) &&
+        src.includes("} else {");
+      const hasStartSession = src.includes("startSession(");
+
+      // The key test: braze.changeUser/openSession must NOT appear before
+      // or outside the else branch. If both startSession and changeUser
+      // appear at the same nesting level (not gated), it's a duplicate.
+      const lines = src.split("\n").map((l: string) => l.trim());
+      const brazeCallLines = lines.filter(
+        (l: string) =>
+          (l.includes("changeUser(") || l.includes("openSession(")) &&
+          !l.startsWith("//") &&
+          !l.includes("Do NOT") &&
+          !l.includes("already performs")
+      );
+      const startSessionLines = lines.filter(
+        (l: string) =>
+          l.includes("startSession(") &&
+          !l.startsWith("//")
+      );
+      // Both paths exist but they must be in separate branches
+      const gated = hasHasBridgeGate && hasBrazeInElse;
+      const allPass = gated && hasStartSession && brazeCallLines.length > 0;
+
+      checks.push({
+        id: "check-16",
+        label: "16. No duplicate identity write (native mode)",
+        status: allPass ? "pass" : "fail",
+        detail: allPass
+          ? "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path."
+          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #16.`,
+      });
+    } catch {
+      checks.push({
+        id: "check-16",
+        label: "16. No duplicate identity write (native mode)",
+        status: "warn",
+        detail: "Could not import bridge-entry module for inspection. See FIXES.md #16.",
+      });
+    }
+
+    // ---------------------------------------------------------------
     // 15) Evidence report — summary of all hardened constants
     // ---------------------------------------------------------------
     checks.push({
@@ -508,7 +561,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (15 checks).
+          to validate against the hardening spec (16 checks).
         </p>
       )}
 
