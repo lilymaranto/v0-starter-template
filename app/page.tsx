@@ -7,7 +7,7 @@ import { createSyncStateMachine } from "@/lib/sync-state";
 import { ValidationPanel } from "@/components/validation-panel";
 
 const USERS = ["viewer_a", "viewer_b"] as const;
-const CONFIG_ID = "solcon-template";
+const CONFIG_ID = process.env.NEXT_PUBLIC_SOLCON_CONFIG_ID ?? "solcon-template";
 const DEFAULT_USER = USERS[0];
 
 type Tab = "app" | "validation";
