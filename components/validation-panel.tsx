@@ -433,15 +433,19 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // EVIDENCE REPORT
+    // 15) Evidence report — summary of all hardened constants
     // ---------------------------------------------------------------
     checks.push({
-      id: "evidence",
-      label: "Evidence report",
+      id: "check-15",
+      label: "15. Evidence report",
       status: "pass",
       detail:
         "Prompt: SOLCON_PROMPT_V0.md | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-driven",
     });
+
+    // Sort: failures first, then warns, then passes
+    const priority = { fail: 0, warn: 1, pass: 2 };
+    checks.sort((a, b) => priority[a.status] - priority[b.status]);
 
     setResults(checks);
     setRunning(false);
@@ -477,7 +481,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (14 checks).
+          to validate against the hardening spec (15 checks).
         </p>
       )}
 
