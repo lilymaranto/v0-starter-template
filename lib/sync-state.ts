@@ -7,6 +7,7 @@ export interface SyncPayload {
   sessionId?: string;
   authority?: string;
   reason?: string;
+  configId?: string;
 }
 
 export interface SyncOptions {
@@ -21,13 +22,15 @@ export interface SyncStateMachine {
 export function createSyncStateMachine({
   initialUserId = "viewer_a",
   manualLockMs = 300,
+  fallbackConfigId,
   renderUser,
   setUser,
 }: {
   initialUserId?: string;
   manualLockMs?: number;
+  fallbackConfigId?: string;
   renderUser: (userId: string) => void;
-  setUser: (userId: string, reason: string) => void;
+  setUser: (userId: string, reason: string, resolvedConfigId?: string) => void;
 }): SyncStateMachine {
   if (typeof renderUser !== "function") {
     throw new Error("createSyncStateMachine requires renderUser(userId)");
@@ -54,7 +57,7 @@ export function createSyncStateMachine({
   }
 
   function applyIncomingSync(
-    { userId, sessionId, authority, reason = "manual" }: SyncPayload,
+    { userId, sessionId, authority, reason = "manual", configId }: SyncPayload,
     { fromNative = false }: SyncOptions = {}
   ): boolean {
     // No toLowerCase -- user IDs are compared as-is, casing may be significant
@@ -76,9 +79,15 @@ export function createSyncStateMachine({
     }
     state.lastAppliedSig = sig;
 
+    // configId resolution order (NFL pattern):
+    // 1) native detail.configId (if present)
+    // 2) explicit web-provided configId from payload
+    // 3) template fallback configId
+    const resolvedConfigId = configId ?? fallbackConfigId;
+
     // Echo suppression: do not re-send native-origin updates back to native
     if (!fromNative) {
-      setUser(incoming, reason);
+      setUser(incoming, reason, resolvedConfigId);
     }
     return true;
   }

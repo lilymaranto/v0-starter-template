@@ -25,8 +25,10 @@ export default function Home() {
     const sync = createSyncStateMachine({
       initialUserId: DEFAULT_USER,
       manualLockMs: 300,
+      fallbackConfigId: CONFIG_ID,
       renderUser: (userId: string) => setActiveUser(userId),
-      setUser: (userId: string, reason: string) => setUser(userId, reason),
+      setUser: (userId: string, reason: string, resolvedConfigId?: string) =>
+        setUser(userId, reason, resolvedConfigId),
     });
     syncRef.current = sync;
 
@@ -46,6 +48,8 @@ export default function Home() {
           sessionId: detail?.sessionId as string | undefined,
           authority: detail?.authority as string | undefined,
           reason: (detail?.reason as string) ?? "manual",
+          // NFL pattern: native detail.configId overrides fallback when present
+          configId: detail?.configId as string | undefined,
         },
         { fromNative: true }
       );

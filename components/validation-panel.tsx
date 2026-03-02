@@ -416,19 +416,46 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 14) Dynamic config ID — no hardcoded configId literal
+    // 14) ConfigId behavior parity with NFL pattern
+    //     - configId present in SyncPayload contract
+    //     - fallbackConfigId exists in sync machine
+    //     - native detail.configId overrides fallback when present
+    //     - no multiple conflicting fallback constants
     // ---------------------------------------------------------------
-    {
-      const configIdValue =
-        process.env.NEXT_PUBLIC_SOLCON_CONFIG_ID ?? null;
-      const hasEnvVar = configIdValue !== null;
+    try {
+      const syncMod = await import("@/lib/sync-state");
+      const bridgeMod = await import("@/lib/bridge-entry");
+      const syncSrc = syncMod.createSyncStateMachine.toString();
+      const setUserSrc = bridgeMod.setUser.toString();
+
+      const inPayload = syncSrc.includes("configId");
+      const hasFallback = syncSrc.includes("fallbackConfigId");
+      const nativeOverride = syncSrc.includes("configId ?? fallbackConfigId") ||
+        syncSrc.includes("configId??fallbackConfigId");
+      const setUserAccepts = setUserSrc.includes("resolvedConfigId");
+
+      const allPass = inPayload && hasFallback && nativeOverride && setUserAccepts;
+      const missing = [
+        !inPayload && "configId not in payload contract",
+        !hasFallback && "no fallbackConfigId parameter",
+        !nativeOverride && "no native override path (configId ?? fallbackConfigId)",
+        !setUserAccepts && "setUser does not accept resolvedConfigId",
+      ].filter(Boolean);
+
       checks.push({
         id: "check-14",
-        label: "14. Dynamic config ID",
-        status: "pass",
-        detail: hasEnvVar
-          ? `configId sourced from NEXT_PUBLIC_SOLCON_CONFIG_ID env var: "${configIdValue}".`
-          : "configId reads from NEXT_PUBLIC_SOLCON_CONFIG_ID with fallback. Set the env var to override the default.",
+        label: "14. ConfigId: NFL pattern parity",
+        status: allPass ? "pass" : "fail",
+        detail: allPass
+          ? "configId in payload contract, fallback exists, native detail.configId overrides fallback, setUser receives resolved value."
+          : `FAIL: ${missing.join("; ")}. See FIXES.md #14.`,
+      });
+    } catch {
+      checks.push({
+        id: "check-14",
+        label: "14. ConfigId: NFL pattern parity",
+        status: "warn",
+        detail: "Could not import modules for configId inspection. See FIXES.md #14.",
       });
     }
 

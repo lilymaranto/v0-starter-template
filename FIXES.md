@@ -89,11 +89,11 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Failure means:** Multiple bridge module variants are imported in app code.
 - **Fix:** Keep one bridge entry file and one import path across the codebase.
 
-## Check 14: Dynamic configId
+## Check 14: ConfigId NFL pattern parity
 
-- **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability.
-- **Failure means:** `configId` is hardcoded to a single literal.
-- **Fix:** Source `configId` from env/prop/state, with explicit fallback behavior.
+- **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability. Must match NFL resolution behavior.
+- **Failure means:** One or more of: configId missing from SyncPayload, no fallbackConfigId param in sync machine, no native override path (`configId ?? fallbackConfigId`), or setUser doesn't accept resolvedConfigId.
+- **Fix:** Resolution order must be: native detail.configId (if present) > explicit web configId > template fallback. Ensure SyncPayload includes configId, createSyncStateMachine accepts fallbackConfigId, applyIncomingSync resolves `configId ?? fallbackConfigId`, and setUser receives the resolved value.
 
 ## Check 15: Evidence report
 

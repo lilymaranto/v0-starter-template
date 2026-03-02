@@ -54,8 +54,15 @@ export function startWebSession({
 
 // setUser is the SOLE OWNER of Braze identity writes.
 // The sync-state machine calls this as its setUser callback.
-export async function setUser(userId: string, reason = "manual") {
+// configId comes from the sync-state resolver (NFL pattern):
+//   native detail.configId > explicit web configId > template fallback
+export async function setUser(userId: string, reason = "manual", resolvedConfigId?: string) {
   if (!userId) return;
+
+  // Update the module-level configId if a new one was resolved
+  if (resolvedConfigId) {
+    currentConfigId = resolvedConfigId;
+  }
 
   // Single identity owner path: Braze changeUser + openSession
   const braze = await getBraze();
