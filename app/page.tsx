@@ -18,21 +18,6 @@ export default function Home() {
   const syncRef = useRef<ReturnType<typeof createSyncStateMachine> | null>(null);
   const initialized = useRef(false);
 
-  // [v0] Temporary: log hardened file hashes for manifest generation
-  useEffect(() => {
-    fetch("/api/scan-source").then(r => r.json()).then(d => {
-      const inv = d.structuralInvariants || [];
-      const manifest: Record<string, string> = {};
-      for (const i of inv) { if (i.sha256) manifest[i.file] = i.sha256; }
-      console.log("[v0] INTEGRITY_MANIFEST " + JSON.stringify(manifest));
-      console.log("[v0] HASH_braze " + (manifest["lib/braze.ts"] || "none"));
-      console.log("[v0] HASH_bridge " + (manifest["lib/bridge-entry.ts"] || "none"));
-      console.log("[v0] HASH_sync " + (manifest["lib/sync-state.ts"] || "none"));
-      console.log("[v0] HASH_track " + (manifest["lib/track-event.ts"] || "none"));
-      console.log("[v0] HASH_middleware " + (manifest["middleware.ts"] || "none"));
-    }).catch((e) => { console.log("[v0] HASH_ERROR " + e.message); });
-  }, []);
-
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;

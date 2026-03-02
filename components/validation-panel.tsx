@@ -204,12 +204,6 @@ export function ValidationPanel() {
     try {
       const res = await fetch("/api/scan-source");
       scanData = await res.json();
-      // [v0] Debug: log hashes for manifest generation
-      if (scanData?.structuralInvariants) {
-        for (const inv of scanData.structuralInvariants) {
-          console.log("[v0] HASH " + inv.file + " " + inv.sha256);
-        }
-      }
     } catch {
       scanError = true;
     }
