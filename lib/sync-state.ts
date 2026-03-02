@@ -20,7 +20,7 @@ export interface SyncStateMachine {
 
 export function createSyncStateMachine({
   initialUserId = "viewer_a",
-  manualLockMs = 2000,
+  manualLockMs = 300,
   renderUser,
   setUser,
 }: {

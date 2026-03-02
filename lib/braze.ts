@@ -1,15 +1,17 @@
 // Centralized Braze SDK initialization.
-// Keeps all Braze config in one place.
-// Identity calls (changeUser/openSession) are exported for use by bridge-entry.ts.
+// Identity writes (changeUser/openSession) are NOT called here.
+// They are owned exclusively by the sync-state setUser callback
+// invoked through bridge-entry.ts. Do not add them elsewhere.
 
 let brazeInitialized = false;
+let brazeInstance: typeof import("@braze/web-sdk") | null = null;
 
 export const BRAZE_API_KEY = "7ea48369-1551-4a9e-b054-d09b40648ef1";
 export const BRAZE_BASE_URL = "sdk.iad-03.braze.com";
 
 export async function initBraze() {
-  if (brazeInitialized) return;
-  if (typeof window === "undefined") return;
+  if (brazeInitialized) return brazeInstance;
+  if (typeof window === "undefined") return null;
 
   const braze = await import("@braze/web-sdk");
 
@@ -19,47 +21,20 @@ export async function initBraze() {
     allowUserSuppliedJavascript: false,
   });
 
-  braze.openSession();
-  brazeInitialized = true;
+  // Do NOT call braze.openSession() or braze.changeUser() here.
+  // The sync-state machine owns the first identity write via startWebSession -> setUser.
 
-  // Expose on window for track-event.ts compatibility
+  brazeInitialized = true;
+  brazeInstance = braze;
+
+  // Expose on window for track-event.ts logCustomEvent access
   (window as unknown as Record<string, unknown>).braze = braze;
 
   return braze;
 }
 
 export async function getBraze() {
+  if (brazeInstance) return brazeInstance;
   if (typeof window === "undefined") return null;
   return import("@braze/web-sdk");
-}
-
-// Granular identity helpers used by bridge-entry.ts to keep changeUser single-threaded.
-export async function changeUser(userId: string) {
-  const braze = await getBraze();
-  if (!braze) return;
-  braze.changeUser(userId);
-}
-
-export async function openSession() {
-  const braze = await getBraze();
-  if (!braze) return;
-  braze.openSession();
-}
-
-export async function logCustomEvent(
-  eventName: string,
-  properties?: Record<string, string>
-) {
-  const braze = await getBraze();
-  if (!braze) return;
-  braze.logCustomEvent(eventName, { ...properties, source: "web" });
-}
-
-export async function setCustomAttribute(key: string, value: string) {
-  const braze = await getBraze();
-  if (!braze) return;
-  const user = braze.getUser();
-  if (user) {
-    user.setCustomUserAttribute(key, value);
-  }
 }

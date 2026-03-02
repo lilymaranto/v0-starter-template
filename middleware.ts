@@ -1,5 +1,5 @@
 // Middleware for iframe embedding support (finisher pattern).
-// Per SOLCON_PROMPT_V0_NEW.md: allow parent origin for dashboard embedding.
+// Per SOLCON_PROMPT_V0.md: allow parent origin for dashboard embedding.
 // Keeps policy route-scoped -- only applies frame-ancestors to app routes.
 
 import { NextResponse } from "next/server";

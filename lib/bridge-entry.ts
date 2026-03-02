@@ -2,12 +2,11 @@
 // Callers import { startWebSession, setUser, listenForNative } from this file.
 // Do not call DemoBridge.* elsewhere; keep changeUser routing single-threaded.
 //
-// AI/V0 hint: Wherever you call startWebSession/setUser, also call
-// braze.changeUser(userId) then braze.openSession() (for the Braze Web SDK)
-// so SDK analytics match the session traffic we emit. Keep those calls
-// centralized here or in a single wrapper to avoid scattered changeUser calls.
+// Identity write rule: braze.changeUser + braze.openSession are called ONLY
+// inside setUser() below. This is the single owner path used by the
+// sync-state machine. Do not call them from providers/components/listeners.
 
-import { changeUser as brazeChangeUser, openSession as brazeOpenSession } from "@/lib/braze";
+import { getBraze } from "@/lib/braze";
 
 declare global {
   interface Window {
@@ -46,27 +45,29 @@ export function startWebSession({
   configId: string;
 }) {
   currentConfigId = configId;
-
-  // Centralized Braze identity call
-  brazeChangeUser(userId);
-  brazeOpenSession();
-
+  // Do NOT call braze.changeUser/openSession here directly.
+  // startWebSession fires the bridge session; the sync-state machine
+  // will call setUser() which owns the Braze identity write.
   if (!hasBridge() || !window.DemoBridge?.startSession) return;
   window.DemoBridge.startSession({ userId, configId, reason: "default" });
 }
 
-export function setUser(userId: string, reason = "manual") {
+// setUser is the SOLE OWNER of Braze identity writes.
+// The sync-state machine calls this as its setUser callback.
+export async function setUser(userId: string, reason = "manual") {
   if (!userId) return;
 
-  // Centralized Braze identity call
-  brazeChangeUser(userId);
-  brazeOpenSession();
+  // Single identity owner path: Braze changeUser + openSession
+  const braze = await getBraze();
+  if (braze) {
+    braze.changeUser(userId);
+    braze.openSession();
+  }
 
   if (!hasBridge() || !window.DemoBridge?.startSession) return;
   if (currentConfigId && window.DemoBridge?.setConfigId) {
     window.DemoBridge.setConfigId(currentConfigId);
   }
-  // Use startSession so web leads a fresh session/handshake on every changeUser.
   window.DemoBridge.startSession({
     userId,
     configId: currentConfigId,
@@ -84,6 +85,5 @@ export function listenForNative(
   window.DemoBridge.initNativeListener((incomingUserId, detail) => {
     if (!incomingUserId) return;
     changeUserFn(incomingUserId, detail);
-    // detail.reason / detail.sessionId / detail.configId available to caller
   });
 }
