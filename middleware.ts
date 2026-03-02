@@ -20,9 +20,11 @@ export function middleware(request: NextRequest) {
     `frame-ancestors ${frameAncestors}`
   );
 
-  // Also set X-Frame-Options for older browsers (ALLOW-FROM is deprecated
-  // but still helps with some legacy user agents)
-  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  // Do NOT set X-Frame-Options here. SAMEORIGIN would block the cross-origin
+  // dashboard embed that frame-ancestors explicitly allows.
+  // Browsers that support CSP ignore XFO; browsers that don't support CSP
+  // are too old for this use case. Removing XFO prevents the header conflict.
+  response.headers.delete("X-Frame-Options");
 
   return response;
 }

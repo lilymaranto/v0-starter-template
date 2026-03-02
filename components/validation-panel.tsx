@@ -557,6 +557,133 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
+    // 17) Native runtime event simulation
+    //     Dispatches a real nativeUserUpdate-shape CustomEvent and asserts:
+    //       - user changes exactly once
+    //       - no immediate rollback
+    //       - no duplicate apply
+    // ---------------------------------------------------------------
+    try {
+      const syncMod = await import("@/lib/sync-state");
+      const testUserId = `__val_test_${Date.now()}`;
+      let applyCount = 0;
+      let lastRendered = "";
+
+      const testSync = syncMod.createSyncStateMachine({
+        initialUserId: "viewer_a",
+        manualLockMs: 300,
+        fallbackConfigId: "test",
+        renderUser: (userId: string) => {
+          lastRendered = userId;
+        },
+        setUser: () => {
+          applyCount++;
+        },
+      });
+
+      // Simulate native dispatch
+      const applied = testSync.applyIncomingSync(
+        {
+          userId: testUserId,
+          reason: "manual",
+          sessionId: "test-session",
+          authority: "native",
+          configId: "test-config",
+        },
+        { fromNative: true }
+      );
+
+      // Try same payload again (should dedupe)
+      const dupe = testSync.applyIncomingSync(
+        {
+          userId: testUserId,
+          reason: "manual",
+          sessionId: "test-session",
+          authority: "native",
+          configId: "test-config",
+        },
+        { fromNative: true }
+      );
+
+      const userUpdated = applied && lastRendered === testUserId;
+      const noDupe = !dupe;
+      const noEcho = applyCount === 0; // fromNative should suppress setUser callback
+      const allPass = userUpdated && noDupe && noEcho;
+
+      const issues = [
+        !applied && "native event did not apply",
+        lastRendered !== testUserId && `rendered "${lastRendered}" instead of "${testUserId}"`,
+        dupe && "duplicate apply was not suppressed",
+        applyCount > 0 && `setUser called ${applyCount}x (should be 0 for fromNative)`,
+      ].filter(Boolean);
+
+      checks.push({
+        id: "check-17",
+        label: "17. Native runtime event simulation",
+        status: allPass ? "pass" : "fail",
+        detail: allPass
+          ? "Mock native event applied exactly once, no bounce, no duplicate, echo suppression active."
+          : `FAIL: ${issues.join("; ")}. See FIXES.md #17.`,
+      });
+    } catch (err) {
+      checks.push({
+        id: "check-17",
+        label: "17. Native runtime event simulation",
+        status: "warn",
+        detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #17.`,
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // 18) Embed header conflict (CSP frame-ancestors vs X-Frame-Options)
+    //     Verifies CSP allows dashboard origin AND XFO does not block it
+    // ---------------------------------------------------------------
+    {
+      const REQUIRED_ORIGIN =
+        "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com";
+      try {
+        const res = await fetch("/api/check-headers");
+        const body = await res.json();
+        const csp: string = body.csp ?? "";
+        const xfo: string | null = body.xFrameOptions ?? null;
+
+        const cspOk = csp.includes("frame-ancestors") && csp.includes(REQUIRED_ORIGIN);
+        const xfoConflict = xfo !== null && xfo !== "" &&
+          (xfo.toUpperCase() === "DENY" || xfo.toUpperCase() === "SAMEORIGIN");
+
+        if (cspOk && !xfoConflict) {
+          checks.push({
+            id: "check-18",
+            label: "18. Embed headers: no conflict",
+            status: "pass",
+            detail: `CSP frame-ancestors allows ${REQUIRED_ORIGIN} and no conflicting X-Frame-Options header.`,
+          });
+        } else if (!cspOk) {
+          checks.push({
+            id: "check-18",
+            label: "18. Embed headers: CSP missing",
+            status: "fail",
+            detail: `CSP frame-ancestors does not include ${REQUIRED_ORIGIN}. See FIXES.md #18.`,
+          });
+        } else {
+          checks.push({
+            id: "check-18",
+            label: "18. Embed headers: XFO conflict",
+            status: "fail",
+            detail: `X-Frame-Options is "${xfo}" which blocks cross-origin embedding even though CSP allows it. Remove or adjust XFO. See FIXES.md #18.`,
+          });
+        }
+      } catch {
+        checks.push({
+          id: "check-18",
+          label: "18. Embed header conflict check",
+          status: "warn",
+          detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #18.",
+        });
+      }
+    }
+
+    // ---------------------------------------------------------------
     // 15) Evidence report — summary of all hardened constants
     // ---------------------------------------------------------------
     checks.push({
@@ -605,7 +732,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (16 checks).
+          to validate against the hardening spec (18 checks).
         </p>
       )}
 

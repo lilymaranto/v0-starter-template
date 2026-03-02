@@ -13,24 +13,30 @@ export async function initBraze() {
   if (brazeInitialized) return brazeInstance;
   if (typeof window === "undefined") return null;
 
-  const braze = await import("@braze/web-sdk");
+  try {
+    const braze = await import("@braze/web-sdk");
 
-  braze.initialize(BRAZE_API_KEY, {
-    baseUrl: `https://${BRAZE_BASE_URL}`,
-    enableLogging: true,
-    allowUserSuppliedJavascript: false,
-  });
+    braze.initialize(BRAZE_API_KEY, {
+      baseUrl: `https://${BRAZE_BASE_URL}`,
+      enableLogging: true,
+      allowUserSuppliedJavascript: false,
+    });
 
-  // Do NOT call braze.openSession() or braze.changeUser() here.
-  // The sync-state machine owns the first identity write via startWebSession -> setUser.
+    // Do NOT call braze.openSession() or braze.changeUser() here.
+    // The sync-state machine owns the first identity write via startWebSession -> setUser.
 
-  brazeInitialized = true;
-  brazeInstance = braze;
+    brazeInitialized = true;
+    brazeInstance = braze;
 
-  // Expose on window for track-event.ts logCustomEvent access
-  (window as unknown as Record<string, unknown>).braze = braze;
+    // Expose on window for track-event.ts logCustomEvent access
+    (window as unknown as Record<string, unknown>).braze = braze;
 
-  return braze;
+    return braze;
+  } catch {
+    // Placeholder keys or missing SDK -- app continues in fallback mode
+    brazeInitialized = true;
+    return null;
+  }
 }
 
 export async function getBraze() {

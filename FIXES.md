@@ -108,6 +108,26 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Both paths must be in separate if/else branches, never sequential.
 - Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
 
+## Check 17: Native runtime event simulation
+
+- **Why it exists:** Static code checks cannot prove real native-to-web behavior.
+- **Failure means:** Dispatching a nativeUserUpdate-shape payload does not update active user exactly once, or causes bounce/duplicate apply.
+- **Fix:** Add a runtime validation action that dispatches a mock native event and asserts:
+  - user changes once
+  - no immediate rollback
+  - no duplicate apply logs/state transitions
+  - echo suppression prevents setUser callback for fromNative events
+
+## Check 18: Embed header conflict (CSP vs X-Frame-Options)
+
+- **Why it exists:** frame-ancestors may be correct while X-Frame-Options still blocks embedding.
+- **Failure means:** Any blocking XFO policy conflicts with intended cross-origin dashboard iframe behavior.
+- **Fix:** Ensure headers are consistent for embed routes:
+  - CSP frame-ancestors includes allowed dashboard origin(s)
+  - X-Frame-Options does not contradict embed intent on those routes
+  - Keep route-scoped policy for non-embed pages
+  - Remove or delete XFO header on embed routes rather than setting SAMEORIGIN
+
 ## Check 15: Evidence report
 
 - **Why it exists:** Forces deterministic proof instead of “looks good” claims.
