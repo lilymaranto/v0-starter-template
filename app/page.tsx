@@ -97,7 +97,7 @@ export default function Home() {
             for custom events.
           </li>
           <li>
-            <span className="font-mono text-foreground">4.</span> Run Validation below when you{"'"}re done.
+            <span className="font-mono text-foreground">4.</span> Run Validation below when you{"'"}re done. Delete the validation component when you{"'"}re finished.
           </li>
         </ol>
       </section>
