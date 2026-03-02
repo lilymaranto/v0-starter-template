@@ -727,8 +727,10 @@ export function ValidationPanel() {
         parts.push(`Structural invariants BROKEN: ${allMissing.join("; ")}`);
       }
 
-      if (!manifestFound) {
-        parts.push("Integrity manifest: not found (run npm run update-integrity-manifest)");
+      if (!manifestFound && strictMode) {
+        parts.push("Integrity manifest: not found (run npm run update-integrity-manifest) [STRICT MODE]");
+      } else if (!manifestFound) {
+        parts.push("Integrity manifest: not present (opt-in via STRICT_INTEGRITY_MODE=true)");
       } else if (integrityOk) {
         parts.push(`Integrity hashes: ${integrity.length}/${integrity.length} match`);
       } else {
@@ -737,13 +739,16 @@ export function ValidationPanel() {
       }
 
       // Determine status
+      // Structural invariants: always enforced (fail if broken)
+      // Integrity hashes: only enforced when STRICT_INTEGRITY_MODE=true
+      // Missing manifest without strict mode: pass (integrity is opt-in)
       let status: "pass" | "fail" | "warn" = "pass";
       if (!invariantsOk) {
-        status = "fail"; // Structural invariants always enforced
-      } else if (!integrityOk && strictMode) {
-        status = "fail"; // Hash mismatch + strict mode = fail
-      } else if (!integrityOk || !manifestFound) {
-        status = "warn"; // Hash mismatch without strict, or no manifest
+        status = "fail";
+      } else if (strictMode && (!manifestFound || !integrityOk)) {
+        status = "fail";
+      } else if (manifestFound && !integrityOk) {
+        status = "warn"; // Manifest exists but hashes differ, non-strict
       }
 
       checks.push({
