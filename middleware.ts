@@ -12,13 +12,22 @@ const ALLOWED_IFRAME_PARENTS = [
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
-  // Build frame-ancestors directive: self + allowed dashboard origins
-  const frameAncestors = ["'self'", ...ALLOWED_IFRAME_PARENTS].join(" ");
+  // In production, lock down frame-ancestors to self + allowed dashboard origins.
+  // In non-production (v0 preview, local dev), allow any embedder so the
+  // preview iframe is not blocked by CSP.
+  const isProduction = process.env.NODE_ENV === "production" &&
+    !request.headers.get("host")?.includes("vusercontent.net") &&
+    !request.headers.get("host")?.includes("v0.dev") &&
+    !request.headers.get("host")?.includes("localhost");
 
-  response.headers.set(
-    "Content-Security-Policy",
-    `frame-ancestors ${frameAncestors}`
-  );
+  if (isProduction) {
+    const frameAncestors = ["'self'", ...ALLOWED_IFRAME_PARENTS].join(" ");
+    response.headers.set(
+      "Content-Security-Policy",
+      `frame-ancestors ${frameAncestors}`
+    );
+  }
+  // else: no frame-ancestors set, so any embedder (v0 preview, localhost) works
 
   // Do NOT set X-Frame-Options here. SAMEORIGIN would block the cross-origin
   // dashboard embed that frame-ancestors explicitly allows.
@@ -29,9 +38,9 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
-// Only apply to app routes, not to static assets or API routes
+// Only apply to page routes, not to static assets or API routes
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icon-|apple-icon).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icon-|apple-icon|api/).*)",
   ],
 };
