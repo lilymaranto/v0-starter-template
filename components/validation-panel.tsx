@@ -177,8 +177,8 @@ export function ValidationPanel() {
           : "5. Browser fallback (no crash)",
         status: "pass",
         detail: hasDemoBridge
-          ? "DemoBridge present -- running in native container."
-          : "DemoBridge not present. App loaded without crashing -- fallback works.",
+          ? "DemoBridge present -- running in native container. See FIXES.md #5."
+          : "DemoBridge not present. App loaded without crashing -- fallback works. See FIXES.md #5.",
       });
     }
 
@@ -695,7 +695,7 @@ export function ValidationPanel() {
       label: "18. Evidence report",
       status: "pass",
       detail:
-        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution",
+        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution. See FIXES.md #18.",
     });
 
     setResults(checks);
