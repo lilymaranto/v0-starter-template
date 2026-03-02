@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 
@@ -248,6 +249,36 @@ export async function GET() {
     structuralInvariants.push({ file: entry.rel, present, missing });
   }
 
+  // -------------------------------------------------------------------
+  // Integrity hash check (opt-in strict mode via STRICT_INTEGRITY_MODE)
+  // -------------------------------------------------------------------
+  const strictMode = process.env.STRICT_INTEGRITY_MODE === "true";
+  type IntegrityResult = { file: string; expected: string; actual: string; match: boolean };
+  const integrityResults: IntegrityResult[] = [];
+  let manifestFound = false;
+
+  const manifestPath = path.join(root, "integrity-manifest.json");
+  if (fs.existsSync(manifestPath)) {
+    manifestFound = true;
+    try {
+      const manifest: Record<string, string> = JSON.parse(
+        fs.readFileSync(manifestPath, "utf-8")
+      );
+      for (const [rel, expectedHash] of Object.entries(manifest)) {
+        const fp = path.join(root, rel);
+        if (!fs.existsSync(fp)) {
+          integrityResults.push({ file: rel, expected: expectedHash, actual: "FILE MISSING", match: false });
+          continue;
+        }
+        const actual = createHash("sha256").update(fs.readFileSync(fp)).digest("hex");
+        integrityResults.push({ file: rel, expected: expectedHash, actual, match: actual === expectedHash });
+      }
+    } catch {
+      // Malformed manifest
+      integrityResults.push({ file: "integrity-manifest.json", expected: "valid JSON", actual: "parse error", match: false });
+    }
+  }
+
   return NextResponse.json({
     scannedFiles: files.length,
     mixedBridgeHits,
@@ -257,5 +288,8 @@ export async function GET() {
     lowercaseIdentityHits,
     lockValueHits,
     structuralInvariants,
+    integrityResults,
+    integrityStrictMode: strictMode,
+    integrityManifestFound: manifestFound,
   });
 }
