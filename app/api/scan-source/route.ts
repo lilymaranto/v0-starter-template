@@ -148,7 +148,7 @@ export async function GET() {
   // Structural invariant checks per @hardened file
   // Each entry: { file, present: string[], missing: string[] }
   // -------------------------------------------------------------------
-  type InvariantResult = { file: string; present: string[]; missing: string[] };
+  type InvariantResult = { file: string; present: string[]; missing: string[]; sha256: string };
   const structuralInvariants: InvariantResult[] = [];
 
   const HARDENED_FILES: { rel: string; required: { label: string; pattern: RegExp }[] }[] = [
@@ -222,7 +222,9 @@ export async function GET() {
       continue;
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const contentBuf = fs.readFileSync(filePath);
+    const content = contentBuf.toString("utf-8");
+    const fileHash = createHash("sha256").update(contentBuf).digest("hex");
     const contentLines = content.split("\n");
     // Build a code-only version (non-comment lines) for absent checks
     const codeOnlyContent = contentLines
@@ -253,7 +255,7 @@ export async function GET() {
       }
     }
 
-    structuralInvariants.push({ file: entry.rel, present, missing });
+    structuralInvariants.push({ file: entry.rel, present, missing, sha256: fileHash });
   }
 
   // -------------------------------------------------------------------
