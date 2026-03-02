@@ -39,7 +39,7 @@ export function ValidationPanel() {
           id: "braze-config",
           label: "Braze SDK configuration",
           status: "fail",
-          detail: `Missing Braze ${missing}. Open lib/braze.ts and replace the placeholder values.`,
+          detail: `Missing Braze ${missing}. Open lib/braze.ts and replace the placeholder values. See FIXES.md #0.`,
         });
       } else {
         checks.push({
@@ -54,7 +54,7 @@ export function ValidationPanel() {
         id: "braze-config",
         label: "Braze SDK configuration",
         status: "fail",
-        detail: "Could not import lib/braze.ts.",
+        detail: "Could not import lib/braze.ts. See FIXES.md #0.",
       });
     }
 
@@ -92,7 +92,7 @@ export function ValidationPanel() {
         status: hasDedupe ? "pass" : "fail",
         detail: hasDedupe
           ? "Sync state machine has signature dedupe to prevent n2 -> n1 bounce."
-          : "Missing signature dedupe in sync state machine.",
+          : "Missing signature dedupe in sync state machine. See FIXES.md #2.",
       });
     } catch {
       checks.push({
@@ -126,7 +126,7 @@ export function ValidationPanel() {
             !forwardsDetail && "detail forwarding in listenForNative",
           ]
             .filter(Boolean)
-            .join(", ")}.`,
+            .join(", ")}. See FIXES.md #3.`,
       });
     } catch {
       checks.push({
@@ -152,7 +152,7 @@ export function ValidationPanel() {
         status: hasBrazePath ? "pass" : "fail",
         detail: hasBrazePath
           ? "trackEvent routes events through Braze. Native Event Log receives events via the Braze SDK hook or explicit fallback."
-          : "trackEvent does not appear to call logCustomEvent.",
+          : "trackEvent does not appear to call logCustomEvent. See FIXES.md #4.",
       });
     } catch {
       checks.push({
@@ -198,7 +198,7 @@ export function ValidationPanel() {
         status: leaked ? "fail" : "pass",
         detail: leaked
           ? `REJECT: DemoBridge referenced outside bridge-entry: ${trackSrc.includes("DemoBridge") ? "track-event " : ""
-          }${syncSrc.includes("DemoBridge") ? "sync-state" : ""}.`
+          }${syncSrc.includes("DemoBridge") ? "sync-state" : ""}. See FIXES.md #6.`
           : "DemoBridge calls confined to lib/bridge-entry.ts only.",
       });
     } catch {
@@ -236,7 +236,7 @@ export function ValidationPanel() {
             id: "check-7",
             label: "7. Iframe: dashboard missing",
             status: "fail",
-            detail: `frame-ancestors is set but does not include ${REQUIRED_ORIGIN}. Update ALLOWED_IFRAME_PARENTS in middleware.ts and app/api/check-csp/route.ts.`,
+            detail: `frame-ancestors is set but does not include ${REQUIRED_ORIGIN}. Update ALLOWED_IFRAME_PARENTS in middleware.ts and app/api/check-csp/route.ts. See FIXES.md #7.`,
           });
         } else {
           checks.push({
@@ -244,7 +244,7 @@ export function ValidationPanel() {
             label: "7. Iframe: no CSP value",
             status: "fail",
             detail:
-              "No frame-ancestors CSP value returned from /api/check-csp. Ensure the route sets the csp field.",
+              "No frame-ancestors CSP value returned from /api/check-csp. Ensure the route sets the csp field. See FIXES.md #7.",
           });
         }
       } catch {
@@ -276,7 +276,7 @@ export function ValidationPanel() {
         label: "8. User IDs case-preserved",
         status: hasLower ? "fail" : "pass",
         detail: hasLower
-          ? "REJECT: .toLowerCase() found in identity codepath. IDs must be trim only."
+          ? "REJECT: .toLowerCase() found in identity codepath. IDs must be trim only. See FIXES.md #8."
           : "No .toLowerCase() in identity flow. User IDs are trim only.",
       });
     } catch {
@@ -307,7 +307,7 @@ export function ValidationPanel() {
       if (hasBad) {
         status = "fail";
         detail =
-          "REJECT: Lock window contains a non-300ms value (found 2000, 3000, 1000, or 30).";
+          "REJECT: Lock window contains a non-300ms value (found 2000, 3000, 1000, or 30). See FIXES.md #9.";
       } else if (!has300) {
         status = "warn";
         detail =
@@ -342,7 +342,7 @@ export function ValidationPanel() {
         label: "10. Event path: no DemoBridge.logEvent",
         status: hasBridgeEvent ? "fail" : "pass",
         detail: hasBridgeEvent
-          ? "REJECT: trackEvent contains DemoBridge event forwarding. Events must route through trackEvent -> braze.logCustomEvent only."
+          ? "REJECT: trackEvent contains DemoBridge event forwarding. Events must route through trackEvent -> braze.logCustomEvent only. See FIXES.md #10."
           : "Events route through trackEvent -> braze.logCustomEvent only. No extra DemoBridge event calls.",
       });
     } catch {
@@ -379,7 +379,7 @@ export function ValidationPanel() {
         label: "11. Single identity owner path",
         status: realCall ? "fail" : "pass",
         detail: realCall
-          ? "REJECT: braze.changeUser/openSession called outside bridge-entry setUser()."
+          ? "REJECT: braze.changeUser/openSession called outside bridge-entry setUser(). See FIXES.md #11."
           : "Identity writes owned exclusively by bridge-entry setUser().",
       });
     } catch {
