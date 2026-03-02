@@ -43,31 +43,6 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Change User */}
-      <section className="flex w-full flex-col items-center gap-3 rounded-xl border border-border bg-card p-4" aria-label="User switcher">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Active User
-        </p>
-        <div className="flex w-full items-center gap-2">
-          {USERS.map((user) => (
-            <button
-              key={user}
-              onClick={() => changeUser(user)}
-              className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                activeUser === user
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {user}
-            </button>
-          ))}
-        </div>
-        <p className="font-mono text-xs text-muted-foreground">
-          Session: <span className="text-foreground">{activeUser}</span>
-        </p>
-      </section>
-
       {/* Instructions */}
       <section className="w-full rounded-xl border border-border bg-card p-4" aria-label="Getting started">
         <h2 className="mb-2 text-base font-semibold text-card-foreground">
@@ -78,11 +53,7 @@ export default function Home() {
             <span className="font-mono text-foreground">1.</span> Edit this page -- Braze + bridge wiring is pre-connected.
           </li>
           <li>
-            <span className="font-mono text-foreground">2.</span> Use{" "}
-            <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
-              changeUser()
-            </code>{" "}
-            or remove it if you only need one user.
+            <span className="font-mono text-foreground">2.</span> Use the user dropdown below or remove it if you only need one user.
           </li>
           <li>
             <span className="font-mono text-foreground">3.</span> Import{" "}
@@ -99,6 +70,43 @@ export default function Home() {
             <span className="font-mono text-foreground">4.</span> Run Validation below when you{"'"}re done.
           </li>
         </ol>
+      </section>
+
+      {/* Change User Dropdown */}
+      <section className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4" aria-label="User switcher">
+        <label
+          htmlFor="user-select"
+          className="shrink-0 text-xs font-medium text-muted-foreground"
+        >
+          Active User
+        </label>
+        <div className="relative flex-1">
+          <select
+            id="user-select"
+            value={activeUser}
+            onChange={(e) => changeUser(e.target.value)}
+            className="w-full appearance-none rounded-lg border border-border bg-secondary px-3 py-2 pr-8 text-sm font-semibold text-secondary-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {USERS.map((user) => (
+              <option key={user} value={user}>
+                {user}
+              </option>
+            ))}
+          </select>
+          <svg
+            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
       </section>
 
       {/* Validation */}
