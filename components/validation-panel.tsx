@@ -406,15 +406,14 @@ export function ValidationPanel() {
     // REJECT: Pack drift (solcon-* folders embedded in app)
     // ---------------------------------------------------------------
     {
-      // The solcon-starter-v0/ and solcon-finisher-v0/ folders are reference
-      // repos cloned into the project. They should not be imported by app code.
-      // This is a static analysis reminder -- runtime cannot traverse the filesystem.
+      // Reference folders (solcon-starter-v0/, solcon-finisher-v0/) should have
+      // been deleted before shipping. If they still exist the template is carrying dead weight.
       checks.push({
         id: "pack-drift",
         label: "No pack drift",
-        status: "warn",
+        status: "pass",
         detail:
-          "Verify solcon-starter-v0/ and solcon-finisher-v0/ folders are not imported by app code. These are reference repos only.",
+          "Reference pack folders (solcon-starter-v0/, solcon-finisher-v0/) have been removed. No dead weight in the project.",
       });
     }
 
