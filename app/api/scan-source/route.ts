@@ -50,6 +50,10 @@ function isComment(line: string): boolean {
   return t.startsWith("//") || t.startsWith("*") || t.startsWith("/*");
 }
 
+function stripStringLiterals(line: string): string {
+  return line.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, "");
+}
+
 const BRIDGE_ENTRY_REL = path.join("lib", "bridge-entry.ts");
 const IDENTITY_FILES = ["lib/sync-state", "lib/bridge-entry"];
 
@@ -83,50 +87,57 @@ export async function GET() {
     for (let i = 0; i < lines.length; i++) {
       const ln = lines[i];
       const lineNum = i + 1;
+      // Strip string literals so quoted text doesn't trigger code-pattern checks
+      const codeLine = stripStringLiterals(ln);
 
       // Mixed bridge imports
       for (const pat of mixedBridgePatterns) {
-        if (ln.includes(pat)) {
+        if (codeLine.includes(pat)) {
           mixedBridgeHits.push({ file: rel, line: lineNum, match: pat });
         }
       }
 
       // Identity writes (changeUser/openSession) outside bridge-entry
       if (!isBridgeEntry && !isComment(ln)) {
-        if (ln.includes("changeUser(") || ln.includes("openSession(")) {
+        if (codeLine.includes("changeUser(") || codeLine.includes("openSession(")) {
           identityWritesOutsideBridgeEntryHits.push({
             file: rel, line: lineNum,
-            match: ln.includes("changeUser(") ? "changeUser(" : "openSession(",
+            match: codeLine.includes("changeUser(") ? "changeUser(" : "openSession(",
           });
         }
       }
 
-      // DemoBridge usage outside bridge-entry
-      if (!isBridgeEntry && !isComment(ln) && ln.includes("DemoBridge")) {
-        demoBridgeOutsideBridgeEntryHits.push({
-          file: rel, line: lineNum, match: "DemoBridge",
-        });
+      // DemoBridge API access outside bridge-entry (code tokens only, not string mentions)
+      if (!isBridgeEntry && !isComment(ln)) {
+        const hasDirectDemoBridgeAccess =
+          /\bwindow\.DemoBridge\b/.test(codeLine) ||
+          /\bDemoBridge(\?)?\./.test(codeLine);
+        if (hasDirectDemoBridgeAccess) {
+          demoBridgeOutsideBridgeEntryHits.push({
+            file: rel, line: lineNum, match: "DemoBridge API access",
+          });
+        }
       }
 
-      // Event bridge forwarding anywhere
+      // Event bridge forwarding anywhere (code tokens only)
       if (!isComment(ln)) {
-        if (ln.includes("DemoBridge.logEvent") || ln.includes("DemoBridge.logCustomEvent")) {
+        if (codeLine.includes("DemoBridge.logEvent") || codeLine.includes("DemoBridge.logCustomEvent")) {
           eventBridgeForwardingHits.push({
             file: rel, line: lineNum,
-            match: ln.includes("DemoBridge.logCustomEvent") ? "DemoBridge.logCustomEvent" : "DemoBridge.logEvent",
+            match: codeLine.includes("DemoBridge.logCustomEvent") ? "DemoBridge.logCustomEvent" : "DemoBridge.logEvent",
           });
         }
       }
 
       // .toLowerCase() in identity-related files
-      if (isIdentityFile && !isComment(ln) && ln.includes(".toLowerCase(")) {
+      if (isIdentityFile && !isComment(ln) && codeLine.includes(".toLowerCase(")) {
         lowercaseIdentityHits.push({
           file: rel, line: lineNum, match: ".toLowerCase(",
         });
       }
 
       // Lock value declarations
-      if (ln.includes("manualLockMs") || ln.includes("DEFAULT_LOCK_MS")) {
+      if (codeLine.includes("manualLockMs") || codeLine.includes("DEFAULT_LOCK_MS")) {
         lockValueHits.push({ file: rel, line: lineNum, match: ln.trim() });
       }
     }
