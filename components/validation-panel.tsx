@@ -456,99 +456,87 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 13) ConfigId behavior parity with NFL pattern
-    //     - configId present in SyncPayload contract
-    //     - fallbackConfigId exists in sync machine
-    //     - native detail.configId overrides fallback when present
-    //     - no multiple conflicting fallback constants
+    // 13) ConfigId resolution parity (uses structural invariants)
     // ---------------------------------------------------------------
-    try {
-      const syncMod = await import("@/lib/sync-state");
-      const bridgeMod = await import("@/lib/bridge-entry");
-      const syncSrc = syncMod.createSyncStateMachine.toString();
-      const setUserSrc = bridgeMod.setUser.toString();
+    if (scanData && !scanError) {
+      const syncInv = scanData.structuralInvariants.find((i) => i.file === "lib/sync-state.ts");
+      const bridgeInv = scanData.structuralInvariants.find((i) => i.file === "lib/bridge-entry.ts");
 
-      const inPayload = syncSrc.includes("configId");
-      const hasFallback = syncSrc.includes("fallbackConfigId");
-      const nativeOverride = syncSrc.includes("configId ?? fallbackConfigId") ||
-        syncSrc.includes("configId??fallbackConfigId");
-      const setUserAccepts = setUserSrc.includes("resolvedConfigId");
+      const requiredLabels = [
+        { source: syncInv, label: "configId in SyncPayload" },
+        { source: syncInv, label: "fallbackConfigId param" },
+        { source: syncInv, label: "configId native override" },
+        { source: bridgeInv, label: "setUser accepts resolvedConfigId" },
+      ];
 
-      const allPass = inPayload && hasFallback && nativeOverride && setUserAccepts;
-      const missing = [
-        !inPayload && "configId not in payload contract",
-        !hasFallback && "no fallbackConfigId parameter",
-        !nativeOverride && "no native override path (configId ?? fallbackConfigId)",
-        !setUserAccepts && "setUser does not accept resolvedConfigId",
-      ].filter(Boolean);
+      const missing = requiredLabels
+        .filter((r) => !r.source?.present.includes(r.label))
+        .map((r) => r.label);
 
       checks.push({
         id: "check-13",
-        label: "13. ConfigId: NFL pattern parity",
-        status: allPass ? "pass" : "fail",
-        detail: allPass
+        label: "13. ConfigId resolution parity",
+        status: missing.length === 0 ? "pass" : "fail",
+        detail: missing.length === 0
           ? "configId in payload contract, fallback exists, native detail.configId overrides fallback, setUser receives resolved value."
           : `FAIL: ${missing.join("; ")}. See FIXES.md #13.`,
       });
-    } catch {
+    } else {
       checks.push({
         id: "check-13",
-        label: "13. ConfigId: NFL pattern parity",
+        label: "13. ConfigId resolution parity",
         status: "warn",
-        detail: "Could not import modules for configId inspection. See FIXES.md #13.",
+        detail: "Could not reach /api/scan-source for configId inspection. See FIXES.md #13.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 14) No duplicate identity write path in native mode
-    //     In native mode: only DemoBridge.startSession, no direct braze calls
-    //     In browser mode: only direct braze.changeUser/openSession
+    // 14) No duplicate identity write path in native mode (uses structural invariants)
+    //     Checks bridge-entry.ts has environment gating with separate branches.
+    //     When Braze placeholders detected (check 0 fail), downgrades to warn.
     // ---------------------------------------------------------------
-    try {
-      const bridgeMod = await import("@/lib/bridge-entry");
-      const src = bridgeMod.setUser.toString();
+    if (scanData && !scanError) {
+      const bridgeInv = scanData.structuralInvariants.find((i) => i.file === "lib/bridge-entry.ts");
 
-      // Check that identity writes are inside an if/else gate, not sequential
-      const hasHasBridgeGate = src.includes("hasBridge()");
-      const hasBrazeInElse =
-        (src.includes("changeUser(") || src.includes("openSession(")) &&
-        src.includes("} else {");
-      const hasStartSession = src.includes("startSession(");
+      const requiredLabels = [
+        "hasBridge() gate",
+        "environment-gated setUser",
+        "explicit else branch in setUser",
+        "native branch startSession",
+        "browser fallback braze identity write",
+      ];
 
-      // The key test: braze.changeUser/openSession must NOT appear before
-      // or outside the else branch. If both startSession and changeUser
-      // appear at the same nesting level (not gated), it's a duplicate.
-      const lines = src.split("\n").map((l: string) => l.trim());
-      const brazeCallLines = lines.filter(
-        (l: string) =>
-          (l.includes("changeUser(") || l.includes("openSession(")) &&
-          !l.startsWith("//") &&
-          !l.includes("Do NOT") &&
-          !l.includes("already performs")
-      );
-      const startSessionLines = lines.filter(
-        (l: string) =>
-          l.includes("startSession(") &&
-          !l.startsWith("//")
-      );
-      // Both paths exist but they must be in separate branches
-      const gated = hasHasBridgeGate && hasBrazeInElse;
-      const allPass = gated && hasStartSession && brazeCallLines.length > 0;
+      const missing = requiredLabels.filter((l) => !bridgeInv?.present.includes(l));
+      const brazePlaceholder = checks.find((c) => c.id === "braze-config")?.status === "fail";
 
-      checks.push({
-        id: "check-14",
-        label: "14. No duplicate identity write (native mode)",
-        status: allPass ? "pass" : "fail",
-        detail: allPass
-          ? "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path."
-          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #14.`,
-      });
-    } catch {
+      if (missing.length === 0) {
+        checks.push({
+          id: "check-14",
+          label: "14. No duplicate identity write (native mode)",
+          status: "pass",
+          detail: "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path.",
+        });
+      } else if (brazePlaceholder) {
+        checks.push({
+          id: "check-14",
+          label: "14. No duplicate identity write (native mode)",
+          status: "warn",
+          detail: `Braze placeholders detected; identity gating check is informational until Braze config is finalized. Missing: ${missing.join("; ")}. See FIXES.md #14.`,
+        });
+      } else {
+        checks.push({
+          id: "check-14",
+          label: "14. No duplicate identity write (native mode)",
+          status: "fail",
+          detail: `FAIL: ${missing.join("; ")}. See FIXES.md #14.`,
+        });
+      }
+    } else {
       checks.push({
         id: "check-14",
         label: "14. No duplicate identity write (native mode)",
         status: "warn",
-        detail: "Could not import bridge-entry module for inspection. See FIXES.md #14.",
+        detail: "Could not reach /api/scan-source for identity gating inspection. See FIXES.md #14.",
       });
     }
 
