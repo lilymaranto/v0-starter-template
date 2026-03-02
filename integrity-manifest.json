@@ -1,7 +1,0 @@
-{
-  "lib/braze.ts": "REGENERATE_WITH_npm_run_update-integrity-manifest",
-  "lib/bridge-entry.ts": "REGENERATE_WITH_npm_run_update-integrity-manifest",
-  "lib/sync-state.ts": "REGENERATE_WITH_npm_run_update-integrity-manifest",
-  "lib/track-event.ts": "REGENERATE_WITH_npm_run_update-integrity-manifest",
-  "middleware.ts": "REGENERATE_WITH_npm_run_update-integrity-manifest"
-}
