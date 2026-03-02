@@ -22,7 +22,7 @@ const HARDENED_FILES = [
   "middleware.ts",
 ];
 
-const manifest = {};
+const manifest: Record<string, string> = {};
 
 for (const rel of HARDENED_FILES) {
   const full = path.join(ROOT, rel);
@@ -30,7 +30,8 @@ for (const rel of HARDENED_FILES) {
     console.warn(`[manifest] SKIP: ${rel} not found`);
     continue;
   }
-  const content = fs.readFileSync(full, "utf-8");
+  // Use raw Buffer read to match scan-source hash computation
+  const content = fs.readFileSync(full);
   const hash = createHash("sha256").update(content).digest("hex");
   manifest[rel] = hash;
   console.log(`[manifest] ${rel} -> ${hash.slice(0, 12)}...`);
