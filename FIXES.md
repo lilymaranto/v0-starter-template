@@ -98,7 +98,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 
-## Check 16: No duplicate identity write path in native mode
+## Check 15: No duplicate identity write path in native mode
 
 - **Why it exists:** In WKWebView container flow, DemoBridge.startSession already performs braze.changeUser/openSession internally. Calling both directly and via bridge creates duplicate user/session writes and racey analytics.
 - **Failure means:** Both direct Braze identity writes (braze.changeUser/openSession) and DemoBridge.startSession execute in the same setUser() code path without environment gating.
@@ -108,7 +108,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Both paths must be in separate if/else branches, never sequential.
 - Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
 
-## Check 17: Native runtime event simulation
+## Check 16: Native runtime event simulation
 
 - **Why it exists:** Static code checks cannot prove real native-to-web behavior.
 - **Failure means:** Dispatching a nativeUserUpdate-shape payload does not update active user exactly once, or causes bounce/duplicate apply.
@@ -118,7 +118,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - no duplicate apply logs/state transitions
   - echo suppression prevents setUser callback for fromNative events
 
-## Check 18: Embed header conflict (CSP vs X-Frame-Options)
+## Check 17: Embed header conflict (CSP vs X-Frame-Options)
 
 - **Why it exists:** frame-ancestors may be correct while X-Frame-Options still blocks embedding.
 - **Failure means:** Any blocking XFO policy conflicts with intended cross-origin dashboard iframe behavior.
@@ -128,7 +128,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - Keep route-scoped policy for non-embed pages
   - Remove or delete XFO header on embed routes rather than setting SAMEORIGIN
 
-## Check 15: Evidence report
+## Check 18: Evidence report
 
 - **Why it exists:** Forces deterministic proof instead of “looks good” claims.
 - **Failure means:** Validation output omits required proof values.

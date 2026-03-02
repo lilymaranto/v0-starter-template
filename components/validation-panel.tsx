@@ -504,7 +504,7 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 16) No duplicate identity write path in native mode
+    // 15) No duplicate identity write path in native mode
     //     In native mode: only DemoBridge.startSession, no direct braze calls
     //     In browser mode: only direct braze.changeUser/openSession
     // ---------------------------------------------------------------
@@ -540,24 +540,24 @@ export function ValidationPanel() {
       const allPass = gated && hasStartSession && brazeCallLines.length > 0;
 
       checks.push({
-        id: "check-16",
-        label: "16. No duplicate identity write (native mode)",
+        id: "check-15",
+        label: "15. No duplicate identity write (native mode)",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path."
-          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #16.`,
+          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #15.`,
       });
     } catch {
       checks.push({
-        id: "check-16",
-        label: "16. No duplicate identity write (native mode)",
+        id: "check-15",
+        label: "15. No duplicate identity write (native mode)",
         status: "warn",
-        detail: "Could not import bridge-entry module for inspection. See FIXES.md #16.",
+        detail: "Could not import bridge-entry module for inspection. See FIXES.md #15.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 17) Native runtime event simulation
+    // 16) Native runtime event simulation
     //     Dispatches a real nativeUserUpdate-shape CustomEvent and asserts:
     //       - user changes exactly once
     //       - no immediate rollback
@@ -618,24 +618,24 @@ export function ValidationPanel() {
       ].filter(Boolean);
 
       checks.push({
-        id: "check-17",
-        label: "17. Native runtime event simulation",
+        id: "check-16",
+        label: "16. Native runtime event simulation",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "Mock native event applied exactly once, no bounce, no duplicate, echo suppression active."
-          : `FAIL: ${issues.join("; ")}. See FIXES.md #17.`,
+          : `FAIL: ${issues.join("; ")}. See FIXES.md #16.`,
       });
     } catch (err) {
       checks.push({
-        id: "check-17",
-        label: "17. Native runtime event simulation",
+        id: "check-16",
+        label: "16. Native runtime event simulation",
         status: "warn",
-        detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #17.`,
+        detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #16.`,
       });
     }
 
     // ---------------------------------------------------------------
-    // 18) Embed header conflict (CSP frame-ancestors vs X-Frame-Options)
+    // 17) Embed header conflict (CSP frame-ancestors vs X-Frame-Options)
     //     Verifies CSP allows dashboard origin AND XFO does not block it
     // ---------------------------------------------------------------
     {
@@ -653,32 +653,32 @@ export function ValidationPanel() {
 
         if (cspOk && !xfoConflict) {
           checks.push({
-            id: "check-18",
-            label: "18. Embed headers: no conflict",
+            id: "check-17",
+            label: "17. Embed headers: no conflict",
             status: "pass",
             detail: `CSP frame-ancestors allows ${REQUIRED_ORIGIN} and no conflicting X-Frame-Options header.`,
           });
         } else if (!cspOk) {
           checks.push({
-            id: "check-18",
-            label: "18. Embed headers: CSP missing",
+            id: "check-17",
+            label: "17. Embed headers: CSP missing",
             status: "fail",
-            detail: `CSP frame-ancestors does not include ${REQUIRED_ORIGIN}. See FIXES.md #18.`,
+            detail: `CSP frame-ancestors does not include ${REQUIRED_ORIGIN}. See FIXES.md #17.`,
           });
         } else {
           checks.push({
-            id: "check-18",
-            label: "18. Embed headers: XFO conflict",
+            id: "check-17",
+            label: "17. Embed headers: XFO conflict",
             status: "fail",
-            detail: `X-Frame-Options is "${xfo}" which blocks cross-origin embedding even though CSP allows it. Remove or adjust XFO. See FIXES.md #18.`,
+            detail: `X-Frame-Options is "${xfo}" which blocks cross-origin embedding even though CSP allows it. Remove or adjust XFO. See FIXES.md #17.`,
           });
         }
       } catch {
         checks.push({
-          id: "check-18",
-          label: "18. Embed header conflict check",
-          status: "warn",
-          detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #18.",
+        id: "check-17",
+        label: "17. Embed header conflict check",
+        status: "warn",
+        detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #17.",
         });
       }
     }
@@ -688,11 +688,11 @@ export function ValidationPanel() {
     checks.sort((a, b) => priority[a.status] - priority[b.status]);
 
     // ---------------------------------------------------------------
-    // Evidence report — always last, after sort
+    // 18) Evidence report — always last, after sort
     // ---------------------------------------------------------------
     checks.push({
-      id: "check-evidence",
-      label: "Evidence report",
+      id: "check-18",
+      label: "18. Evidence report",
       status: "pass",
       detail:
         "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution",
