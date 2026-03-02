@@ -213,36 +213,37 @@ export function ValidationPanel() {
 
     // ---------------------------------------------------------------
     // 7) Iframe check — doppel dashboard URL in frame-ancestors
+    //    Hits /api/check-csp which echoes the CSP header back
     // ---------------------------------------------------------------
     {
       const REQUIRED_ORIGIN =
         "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com";
       try {
-        const res = await fetch(window.location.href, { method: "HEAD" });
+        const res = await fetch("/api/check-csp");
         const csp = res.headers.get("content-security-policy") ?? "";
         const hasFrameAncestors = csp.includes("frame-ancestors");
         const hasDoppel = csp.includes(REQUIRED_ORIGIN);
         if (hasFrameAncestors && hasDoppel) {
           checks.push({
             id: "check-7",
-            label: "7. Iframe: doppel dashboard allowed",
+            label: "7. Iframe: dashboard allowed",
             status: "pass",
-            detail: `frame-ancestors CSP includes ${REQUIRED_ORIGIN}.`,
+            detail: `frame-ancestors CSP includes ${REQUIRED_ORIGIN}. Middleware and API route are aligned.`,
           });
         } else if (hasFrameAncestors && !hasDoppel) {
           checks.push({
             id: "check-7",
-            label: "7. Iframe: doppel dashboard missing",
+            label: "7. Iframe: dashboard missing",
             status: "fail",
-            detail: `frame-ancestors is set but does not include ${REQUIRED_ORIGIN}. Update middleware.ts.`,
+            detail: `frame-ancestors is set but does not include ${REQUIRED_ORIGIN}. Update ALLOWED_IFRAME_PARENTS in middleware.ts and app/api/check-csp/route.ts.`,
           });
         } else {
           checks.push({
             id: "check-7",
             label: "7. Iframe: no CSP header",
-            status: "warn",
+            status: "fail",
             detail:
-              "No frame-ancestors CSP header detected. If embedding is needed, configure middleware.ts.",
+              "No frame-ancestors CSP header detected. The middleware and /api/check-csp route must set it.",
           });
         }
       } catch {
@@ -250,7 +251,7 @@ export function ValidationPanel() {
           id: "check-7",
           label: "7. Iframe check",
           status: "warn",
-          detail: "Could not fetch response headers for iframe check.",
+          detail: "Could not reach /api/check-csp. Ensure the route exists.",
         });
       }
     }
