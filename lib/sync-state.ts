@@ -1,12 +1,6 @@
-// Golden reference sync reducer for SolCon web apps (finisher pattern).
+// Sync state machine for SolCon web apps.
 // Single state writer: all identity changes (web and native) flow through applyIncomingSync.
 // Enforces: dedupe via signature, echo suppression for native-origin, manual lock window.
-
-const DEFAULT_LOCK_MS = 3000;
-
-function normalizeUserId(raw: string | null | undefined): string {
-  return String(raw ?? "").trim().toLowerCase();
-}
 
 export interface SyncPayload {
   userId: string;
@@ -26,7 +20,7 @@ export interface SyncStateMachine {
 
 export function createSyncStateMachine({
   initialUserId = "viewer_a",
-  manualLockMs = DEFAULT_LOCK_MS,
+  manualLockMs = 2000,
   renderUser,
   setUser,
 }: {
@@ -43,19 +37,19 @@ export function createSyncStateMachine({
   }
 
   const state = {
-    activeUserId: normalizeUserId(initialUserId) || "viewer_a",
+    activeUserId: initialUserId || "viewer_a",
     lastAppliedSig: "",
     lastManualAt: 0,
   };
 
   function shouldSkipDefaultRollback(
-    normalizedUser: string,
+    incoming: string,
     reason: string
   ): boolean {
     return (
       reason === "default" &&
       Date.now() - state.lastManualAt < manualLockMs &&
-      normalizedUser !== state.activeUserId
+      incoming !== state.activeUserId
     );
   }
 
@@ -63,27 +57,28 @@ export function createSyncStateMachine({
     { userId, sessionId, authority, reason = "manual" }: SyncPayload,
     { fromNative = false }: SyncOptions = {}
   ): boolean {
-    const normalizedUser = normalizeUserId(userId);
-    if (!normalizedUser) return false;
+    // No toLowerCase -- user IDs are compared as-is, casing may be significant
+    const incoming = String(userId ?? "").trim();
+    if (!incoming) return false;
 
     // Dedupe via signature check
-    const sig = `${normalizedUser}|${sessionId ?? "na"}|${authority ?? "na"}|${reason ?? "na"}`;
+    const sig = `${incoming}|${sessionId ?? "na"}|${authority ?? "na"}|${reason ?? "na"}`;
     if (sig === state.lastAppliedSig) return false;
 
     // Manual lock window: skip default rollbacks within lock period
-    if (shouldSkipDefaultRollback(normalizedUser, reason)) return false;
+    if (shouldSkipDefaultRollback(incoming, reason)) return false;
 
-    state.activeUserId = normalizedUser;
-    renderUser(normalizedUser);
+    state.activeUserId = incoming;
+    renderUser(incoming);
 
     if (reason === "manual") {
       state.lastManualAt = Date.now();
     }
     state.lastAppliedSig = sig;
 
-    // Echo suppression: do not re-send native-origin updates back to native.
+    // Echo suppression: do not re-send native-origin updates back to native
     if (!fromNative) {
-      setUser(normalizedUser, reason);
+      setUser(incoming, reason);
     }
     return true;
   }

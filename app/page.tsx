@@ -1,164 +1,108 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Tv } from "lucide-react";
-import { UserSelector } from "@/components/user-selector";
-import { VideoPlayer } from "@/components/video-player";
-import { CategoryButtons } from "@/components/category-buttons";
-import { EventLog, type LogEntry } from "@/components/event-log";
-import { initBraze, logCustomEvent, setCustomAttribute } from "@/lib/braze";
+import { useEffect, useRef, useState } from "react";
+import { initBraze } from "@/lib/braze";
 import { startWebSession, setUser, listenForNative } from "@/lib/bridge-entry";
-import { createSyncStateMachine, type SyncStateMachine } from "@/lib/sync-state";
-import { trackEvent } from "@/lib/track-event";
+import { ValidationPanel } from "@/components/validation-panel";
 
-const CONFIG_ID = "solcon-video-player";
-
-function timestamp() {
-  return new Date().toLocaleTimeString("en-US", {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-let entryCounter = 0;
-function nextId() {
-  return `entry-${++entryCounter}`;
-}
+const USERS = ["viewer_a", "viewer_b"] as const;
+const CONFIG_ID = "solcon-template";
 
 export default function Home() {
-  const [activeUser, setActiveUser] = useState("viewer_a");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+  const [activeUser, setActiveUser] = useState<string>(USERS[0]);
   const initialized = useRef(false);
-  const syncMachine = useRef<SyncStateMachine | null>(null);
 
-  const addLog = useCallback(
-    (type: LogEntry["type"], message: string) => {
-      setLogEntries((prev) => [
-        { id: nextId(), timestamp: timestamp(), type, message },
-        ...prev,
-      ]);
-    },
-    []
-  );
-
-  // Initialize Braze SDK, sync state machine, bridge session, and native listener
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
     initBraze().then(() => {
-      addLog("init", "Braze SDK initialized");
-
-      // Create sync state machine with dedupe, echo suppression, and lock window
-      syncMachine.current = createSyncStateMachine({
-        initialUserId: "viewer_a",
-        renderUser: (userId: string) => {
-          setActiveUser(userId);
-          addLog("user_change", `Sync applied: user = "${userId}"`);
-        },
-        setUser: (userId: string, reason: string) => {
-          setUser(userId, reason);
-        },
-      });
-
-      // Start initial web session through centralized bridge
-      startWebSession({ userId: "viewer_a", configId: CONFIG_ID });
-      addLog("init", "Bridge session started for viewer_a");
-
-      // Listen for native-origin user changes
-      listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
-        addLog("init", `Native push received: ${incomingUserId}`);
-        syncMachine.current?.applyIncomingSync(
-          {
-            userId: incomingUserId,
-            sessionId: (detail?.sessionId as string) ?? undefined,
-            authority: (detail?.authority as string) ?? undefined,
-            reason: (detail?.reason as string) ?? "manual",
-          },
-          { fromNative: true }
-        );
-      });
+      startWebSession({ userId: USERS[0], configId: CONFIG_ID });
     });
-  }, [addLog]);
 
-  // Handle web-originated user switch via sync machine
-  function handleSelectUser(userId: string) {
-    const applied = syncMachine.current?.applyIncomingSync(
-      { userId, reason: "manual" },
-      { fromNative: false }
-    );
-    if (applied) {
-      addLog("user_change", `Web switch: user changed to "${userId}"`);
-    }
-  }
+    listenForNative((incomingUserId: string) => {
+      if (!incomingUserId) return;
+      setActiveUser(incomingUserId);
+    });
+  }, []);
 
-  // Handle watch button click -- routes through trackEvent helper
-  async function handleWatch(category: string) {
-    setActiveCategory(category);
-
-    // 1. Log video_started event through unified trackEvent (native + Braze)
-    trackEvent("video_started", { category });
-    await logCustomEvent("video_started", { category });
-    addLog("event", `video_started { category: "${category}" }`);
-
-    // 2. Set custom attribute last_watched_category
-    await setCustomAttribute("last_watched_category", category);
-    addLog("attribute", `last_watched_category = "${category}"`);
+  function changeUser(userId: string) {
+    setActiveUser(userId);
+    setUser(userId, "manual");
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-12 bg-background px-4 py-16">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl flex-col items-start gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Tv className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-foreground leading-tight text-balance">
-                SolCon Video Player
-              </h1>
-              <p className="text-xs text-muted-foreground font-mono">
-                PWA + Braze Analytics
-              </p>
-            </div>
-          </div>
-          <UserSelector
-            activeUser={activeUser}
-            onSelectUser={handleSelectUser}
-          />
-        </div>
-      </header>
-
-      {/* Content */}
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="flex flex-col gap-8">
-          {/* Video Player */}
-          <section aria-label="Video player">
-            <VideoPlayer category={activeCategory} />
-          </section>
-
-          {/* Category Buttons */}
-          <section aria-label="Video categories">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Choose a Category
-            </h2>
-            <CategoryButtons
-              activeCategory={activeCategory}
-              onWatch={handleWatch}
-            />
-          </section>
-
-          {/* Event Log */}
-          <section aria-label="Analytics event log">
-            <EventLog entries={logEntries} />
-          </section>
-        </div>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance">
+          SolCon Template
+        </h1>
+        <p className="max-w-md text-base text-muted-foreground leading-relaxed">
+          Braze + DemoBridge wiring is ready. Switch users below, then start
+          building your app on top of this.
+        </p>
       </div>
+
+      {/* Change User */}
+      <section className="flex flex-col items-center gap-4" aria-label="User switcher">
+        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Active User
+        </p>
+        <div className="flex items-center gap-3">
+          {USERS.map((user) => (
+            <button
+              key={user}
+              onClick={() => changeUser(user)}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors ${
+                activeUser === user
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              {user}
+            </button>
+          ))}
+        </div>
+        <p className="font-mono text-xs text-muted-foreground">
+          Session: <span className="text-foreground">{activeUser}</span>
+        </p>
+      </section>
+
+      {/* Instructions */}
+      <section className="w-full max-w-lg rounded-xl border border-border bg-card p-6" aria-label="Getting started">
+        <h2 className="mb-3 text-lg font-semibold text-card-foreground">
+          Start building now
+        </h2>
+        <ol className="flex flex-col gap-2 text-sm text-muted-foreground leading-relaxed">
+          <li>
+            <span className="font-mono text-foreground">1.</span> Edit this page
+            or add new routes -- the Braze + bridge wiring is pre-connected.
+          </li>
+          <li>
+            <span className="font-mono text-foreground">2.</span> Use{" "}
+            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">
+              changeUser()
+            </code>{" "}
+            above or remove it if you only need one user.
+          </li>
+          <li>
+            <span className="font-mono text-foreground">3.</span> Import{" "}
+            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">
+              trackEvent
+            </code>{" "}
+            from <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">@/lib/track-event</code>{" "}
+            for custom events.
+          </li>
+          <li>
+            <span className="font-mono text-foreground">4.</span> When
+            you{"'"}re done, open the Validation Panel below to check for drift.
+          </li>
+        </ol>
+      </section>
+
+      {/* Validation */}
+      <ValidationPanel />
     </main>
   );
 }

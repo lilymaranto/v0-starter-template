@@ -15,8 +15,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'SolCon Video Player',
-  description: 'PWA Video Player with Braze analytics integration',
+  title: 'SolCon Template',
+  description: 'PWA template with Braze + DemoBridge wiring and validation',
   manifest: '/manifest.json',
   icons: {
     icon: [
