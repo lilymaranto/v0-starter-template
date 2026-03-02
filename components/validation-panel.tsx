@@ -683,20 +683,20 @@ export function ValidationPanel() {
       }
     }
 
+    // Sort: failures first, then warns, then passes
+    const priority = { fail: 0, warn: 1, pass: 2 };
+    checks.sort((a, b) => priority[a.status] - priority[b.status]);
+
     // ---------------------------------------------------------------
-    // 15) Evidence report — summary of all hardened constants
+    // Evidence report — always last, after sort
     // ---------------------------------------------------------------
     checks.push({
-      id: "check-15",
-      label: "15. Evidence report",
+      id: "check-evidence",
+      label: "Evidence report",
       status: "pass",
       detail:
         "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution",
     });
-
-    // Sort: failures first, then warns, then passes
-    const priority = { fail: 0, warn: 1, pass: 2 };
-    checks.sort((a, b) => priority[a.status] - priority[b.status]);
 
     setResults(checks);
     setRunning(false);
