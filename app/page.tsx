@@ -32,29 +32,28 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-12 bg-background px-4 py-16">
+    <main className="flex flex-col items-center gap-6 px-5 pb-10 pt-4">
       {/* Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground text-balance">
           SolCon Template
         </h1>
-        <p className="max-w-md text-base text-muted-foreground leading-relaxed">
-          Braze + DemoBridge wiring is ready. Switch users below, then start
-          building your app on top of this.
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Braze + DemoBridge wiring is ready. Switch users below, then start building your app.
         </p>
       </div>
 
       {/* Change User */}
-      <section className="flex flex-col items-center gap-4" aria-label="User switcher">
-        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+      <section className="flex w-full flex-col items-center gap-3 rounded-xl border border-border bg-card p-4" aria-label="User switcher">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Active User
         </p>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center gap-2">
           {USERS.map((user) => (
             <button
               key={user}
               onClick={() => changeUser(user)}
-              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors ${
+              className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
                 activeUser === user
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
@@ -70,33 +69,34 @@ export default function Home() {
       </section>
 
       {/* Instructions */}
-      <section className="w-full max-w-lg rounded-xl border border-border bg-card p-6" aria-label="Getting started">
-        <h2 className="mb-3 text-lg font-semibold text-card-foreground">
+      <section className="w-full rounded-xl border border-border bg-card p-4" aria-label="Getting started">
+        <h2 className="mb-2 text-base font-semibold text-card-foreground">
           Start building now
         </h2>
-        <ol className="flex flex-col gap-2 text-sm text-muted-foreground leading-relaxed">
+        <ol className="flex flex-col gap-1.5 text-xs text-muted-foreground leading-relaxed">
           <li>
-            <span className="font-mono text-foreground">1.</span> Edit this page
-            or add new routes -- the Braze + bridge wiring is pre-connected.
+            <span className="font-mono text-foreground">1.</span> Edit this page -- Braze + bridge wiring is pre-connected.
           </li>
           <li>
             <span className="font-mono text-foreground">2.</span> Use{" "}
-            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">
+            <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
               changeUser()
             </code>{" "}
-            above or remove it if you only need one user.
+            or remove it if you only need one user.
           </li>
           <li>
             <span className="font-mono text-foreground">3.</span> Import{" "}
-            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">
+            <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
               trackEvent
             </code>{" "}
-            from <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-foreground">@/lib/track-event</code>{" "}
+            from{" "}
+            <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
+              @/lib/track-event
+            </code>{" "}
             for custom events.
           </li>
           <li>
-            <span className="font-mono text-foreground">4.</span> When
-            you{"'"}re done, open the Validation Panel below to check for drift.
+            <span className="font-mono text-foreground">4.</span> Run Validation below when you{"'"}re done.
           </li>
         </ol>
       </section>

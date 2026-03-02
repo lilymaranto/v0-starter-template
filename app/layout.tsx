@@ -44,8 +44,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
-        {children}
+      <body className="font-sans antialiased flex min-h-screen items-start justify-center bg-black/90 py-6">
+        <div className="relative mx-auto w-full max-w-[390px] min-h-[844px] overflow-hidden rounded-[2.5rem] border-[3px] border-white/10 bg-background shadow-2xl shadow-black/50">
+          {/* Status bar notch */}
+          <div className="sticky top-0 z-50 flex items-center justify-center pb-1 pt-3">
+            <div className="h-[26px] w-[120px] rounded-full bg-black" />
+          </div>
+          {/* App content */}
+          <div className="overflow-y-auto">
+            {children}
+          </div>
+        </div>
         <Analytics />
       </body>
     </html>
