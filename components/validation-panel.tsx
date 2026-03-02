@@ -672,9 +672,9 @@ export function ValidationPanel() {
             // Non-production: middleware intentionally omits frame-ancestors
             checks.push({
               id: "check-16",
-              label: "16. Embed headers: preview/local skip",
-              status: "warn",
-              detail: `Non-production host (${envHost}): middleware intentionally omits CSP frame-ancestors. Will enforce in production. See FIXES.md #16.`,
+              label: "16. Embed headers: preview/local exempt",
+              status: "pass",
+              detail: `Non-production host (${envHost}): CSP frame-ancestors intentionally omitted; production enforcement required.`,
             });
           } else {
             // Production-like but CSP missing
