@@ -1,15 +1,23 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _inter = Inter({ subsets: ["latin"] });
+const _jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] });
+
+export const viewport: Viewport = {
+  themeColor: '#e03e36',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'SolCon Video Player',
+  description: 'PWA Video Player with Braze analytics integration',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       {
