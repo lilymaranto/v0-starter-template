@@ -47,11 +47,11 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Failure means:** `window.DemoBridge` is called from multiple files.
 - **Fix:** Keep direct DemoBridge calls only in one bridge entry module.
 
-## Check 7: Iframe CSP header
+## Check 7: Iframe CSP header (intended policy)
 
 - **Why it exists:** Required for preview/embed flows in dashboard contexts.
-- **Failure means:** `frame-ancestors` policy is missing or too restrictive.
-- **Fix:** Set route-scoped CSP headers to allow required parent origins.
+- **Failure means:** Intended `frame-ancestors` policy (from /api/check-csp) is missing or does not include required dashboard origin.
+- **Fix:** Update ALLOWED_IFRAME_PARENTS in check-csp route and middleware.ts to include the required parent origin. This checks intended policy; Check 16 verifies observed runtime headers.
 
 ## Check 8: Case-preserved userId
 
@@ -74,8 +74,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 ## Check 11: Single identity owner
 
 - **Why it exists:** Avoids race conditions and split authority over active user.
-- **Failure means:** `braze.changeUser`/`braze.openSession` called from multiple places.
-- **Fix:** Restrict identity writes to the single sync-owned `setUser` path.
+- **Failure means:** `changeUser()`/`openSession()` calls found outside lib/bridge-entry.ts via scan-source evidence across all runtime files.
+- **Fix:** Restrict identity writes to the single sync-owned `setUser` path in lib/bridge-entry.ts. Remove any direct braze.changeUser/openSession calls from other files.
 
 ## Check 12: No mixed bridge imports
 
@@ -112,15 +112,15 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - no duplicate apply logs/state transitions
   - echo suppression prevents setUser callback for fromNative events
 
-## Check 16: Embed header conflict (CSP vs X-Frame-Options)
+## Check 16: Embed header conflict (observed runtime headers)
 
-- **Why it exists:** frame-ancestors may be correct while X-Frame-Options still blocks embedding.
-- **Failure means:** Any blocking XFO policy conflicts with intended cross-origin dashboard iframe behavior.
+- **Why it exists:** Intended policy (Check 7) may be correct while actual observed headers differ due to middleware/proxy/CDN injection.
+- **Failure means:** Real observed CSP on a same-origin fetch to "/" does not include required origin, or observed X-Frame-Options is DENY/SAMEORIGIN which blocks embedding.
 - **Fix:** Ensure headers are consistent for embed routes:
-  - CSP frame-ancestors includes allowed dashboard origin(s)
-  - X-Frame-Options does not contradict embed intent on those routes
+  - Observed CSP frame-ancestors must include allowed dashboard origin(s)
+  - Observed X-Frame-Options must not contradict embed intent (remove or delete XFO on embed routes)
   - Keep route-scoped policy for non-embed pages
-  - Remove or delete XFO header on embed routes rather than setting SAMEORIGIN
+  - If observation fails, check that /api/check-headers can fetch "/" internally
 
 ## Check 17: Evidence report
 

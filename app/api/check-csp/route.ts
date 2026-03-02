@@ -12,7 +12,10 @@ export async function GET() {
   ];
 
   const frameAncestors = ["'self'", ...ALLOWED_IFRAME_PARENTS].join(" ");
-  const csp = `frame-ancestors ${frameAncestors}`;
+  const intendedCsp = `frame-ancestors ${frameAncestors}`;
 
-  return NextResponse.json({ csp });
+  return NextResponse.json({
+    intendedCsp,
+    allowedParents: ALLOWED_IFRAME_PARENTS,
+  });
 }
