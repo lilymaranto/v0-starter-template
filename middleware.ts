@@ -1,3 +1,7 @@
+// @hardened — do not modify without re-running validation panel.
+// Structural invariants enforced: ALLOWED_IFRAME_PARENTS, frame-ancestors CSP,
+// no X-Frame-Options, API routes excluded from matcher.
+//
 // Middleware for iframe embedding support (finisher pattern).
 // Allow parent origin for dashboard embedding (iframe CSP).
 // Keeps policy route-scoped -- only applies frame-ancestors to app routes.

@@ -1,3 +1,7 @@
+// @hardened — do not modify without re-running validation panel.
+// Structural invariants enforced: hasBridge() gate, environment-gated setUser,
+// no .toLowerCase() in identity path, DemoBridge access confined here.
+//
 // Centralized identity sync entrypoint for SolCon builds (finisher pattern).
 // Callers import { startWebSession, setUser, listenForNative } from this file.
 // Do not call DemoBridge.* elsewhere; keep changeUser routing single-threaded.

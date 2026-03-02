@@ -1,3 +1,6 @@
+// @hardened — do not modify without re-running validation panel.
+// Structural invariants enforced: logCustomEvent present, no DemoBridge event forwarding.
+//
 // Single trackEvent helper for SolCon builds.
 // Routes all web custom events through the Braze Web SDK only.
 // Native container reads events from Braze -- no dual-write to DemoBridge.

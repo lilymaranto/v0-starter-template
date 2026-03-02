@@ -143,6 +143,111 @@ export async function GET() {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Structural invariant checks per @hardened file
+  // Each entry: { file, present: string[], missing: string[] }
+  // -------------------------------------------------------------------
+  type InvariantResult = { file: string; present: string[]; missing: string[] };
+  const structuralInvariants: InvariantResult[] = [];
+
+  const HARDENED_FILES: { rel: string; required: { label: string; pattern: RegExp }[] }[] = [
+    {
+      rel: "lib/braze.ts",
+      required: [
+        { label: "@hardened header", pattern: /@hardened/ },
+        { label: "no changeUser call", pattern: /^(?!.*(?:\/\/|\/\*)).*\bchangeUser\s*\(/m },
+        { label: "no openSession call", pattern: /^(?!.*(?:\/\/|\/\*)).*\bopenSession\s*\(/m },
+        { label: "allowUserSuppliedJavascript: false", pattern: /allowUserSuppliedJavascript:\s*false/ },
+      ],
+    },
+    {
+      rel: "lib/bridge-entry.ts",
+      required: [
+        { label: "@hardened header", pattern: /@hardened/ },
+        { label: "hasBridge() gate", pattern: /function\s+hasBridge\s*\(/ },
+        { label: "environment-gated setUser", pattern: /if\s*\(\s*hasBridge\s*\(/ },
+        { label: "exports setUser", pattern: /export\s+(async\s+)?function\s+setUser/ },
+        { label: "exports startWebSession", pattern: /export\s+function\s+startWebSession/ },
+        { label: "exports listenForNative", pattern: /export\s+function\s+listenForNative/ },
+      ],
+    },
+    {
+      rel: "lib/sync-state.ts",
+      required: [
+        { label: "@hardened header", pattern: /@hardened/ },
+        { label: "manualLockMs param", pattern: /manualLockMs/ },
+        { label: "lastAppliedSig dedupe", pattern: /lastAppliedSig/ },
+        { label: "fromNative echo suppression", pattern: /fromNative/ },
+        { label: "configId in SyncPayload", pattern: /configId\??:\s*string/ },
+        { label: "fallbackConfigId param", pattern: /fallbackConfigId/ },
+        { label: "no toLowerCase", pattern: /\.toLowerCase\s*\(/ },
+      ],
+    },
+    {
+      rel: "lib/track-event.ts",
+      required: [
+        { label: "@hardened header", pattern: /@hardened/ },
+        { label: "logCustomEvent call", pattern: /logCustomEvent/ },
+        { label: "no DemoBridge forwarding", pattern: /DemoBridge\s*\.\s*(logEvent|logCustomEvent)/ },
+      ],
+    },
+    {
+      rel: "middleware.ts",
+      required: [
+        { label: "@hardened header", pattern: /@hardened/ },
+        { label: "ALLOWED_IFRAME_PARENTS", pattern: /ALLOWED_IFRAME_PARENTS/ },
+        { label: "frame-ancestors CSP", pattern: /frame-ancestors/ },
+        { label: "X-Frame-Options delete", pattern: /delete.*X-Frame-Options|X-Frame-Options.*delete/ },
+        { label: "API routes excluded", pattern: /api\// },
+      ],
+    },
+  ];
+
+  // Patterns that must be ABSENT (inverted checks)
+  const MUST_BE_ABSENT: Record<string, string[]> = {
+    "lib/sync-state.ts": ["no toLowerCase"],
+    "lib/track-event.ts": ["no DemoBridge forwarding"],
+    "lib/braze.ts": ["no changeUser call", "no openSession call"],
+  };
+
+  for (const entry of HARDENED_FILES) {
+    const filePath = path.join(root, entry.rel);
+    if (!fs.existsSync(filePath)) {
+      structuralInvariants.push({
+        file: entry.rel,
+        present: [],
+        missing: ["FILE MISSING"],
+      });
+      continue;
+    }
+
+    const content = fs.readFileSync(filePath, "utf-8");
+    const present: string[] = [];
+    const missing: string[] = [];
+    const absentChecks = MUST_BE_ABSENT[entry.rel] ?? [];
+
+    for (const req of entry.required) {
+      const found = req.pattern.test(content);
+      if (absentChecks.includes(req.label)) {
+        // Inverted: pattern must NOT match
+        if (found) {
+          missing.push(req.label);
+        } else {
+          present.push(req.label);
+        }
+      } else {
+        // Normal: pattern must match
+        if (found) {
+          present.push(req.label);
+        } else {
+          missing.push(req.label);
+        }
+      }
+    }
+
+    structuralInvariants.push({ file: entry.rel, present, missing });
+  }
+
   return NextResponse.json({
     scannedFiles: files.length,
     mixedBridgeHits,
@@ -151,5 +256,6 @@ export async function GET() {
     eventBridgeForwardingHits,
     lowercaseIdentityHits,
     lockValueHits,
+    structuralInvariants,
   });
 }

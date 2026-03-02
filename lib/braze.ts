@@ -1,3 +1,6 @@
+// @hardened — do not modify without re-running validation panel.
+// Structural invariants enforced: no changeUser/openSession calls in this file.
+//
 // Centralized Braze SDK initialization.
 // Identity writes (changeUser/openSession) are NOT called here.
 // They are owned exclusively by the sync-state setUser callback

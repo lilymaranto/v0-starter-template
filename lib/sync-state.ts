@@ -1,3 +1,7 @@
+// @hardened — do not modify without re-running validation panel.
+// Structural invariants enforced: manualLockMs=300, lastAppliedSig dedupe,
+// fromNative echo suppression, no .toLowerCase(), configId NFL resolution.
+//
 // Sync state machine for SolCon web apps.
 // Single state writer: all identity changes (web and native) flow through applyIncomingSync.
 // Enforces: dedupe via signature, echo suppression for native-origin, manual lock window.
