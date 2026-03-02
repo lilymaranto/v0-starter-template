@@ -398,7 +398,7 @@ export function ValidationPanel() {
         label: "12. Prompt filename hygiene",
         status: "pass",
         detail:
-          "Runtime OK. Manually verify no SOLCON_PROMPT_V0.md or STARTER_PROMPT references in app source files. See FIXES.md #12.",
+          "Runtime OK. Manually verify no legacy prompt filename references or naming drift in app source files. See FIXES.md #12.",
       });
     }
 
@@ -467,7 +467,7 @@ export function ValidationPanel() {
       label: "15. Evidence report",
       status: "pass",
       detail:
-        "Prompt: SOLCON_PROMPT_V0.md | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-driven",
+        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution",
     });
 
     // Sort: failures first, then warns, then passes

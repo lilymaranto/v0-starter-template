@@ -80,8 +80,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 ## Check 12: Prompt filename hygiene
 
 - **Why it exists:** Prevents stale prompt drift.
-- **Failure means:** Legacy prompt names (for example `_NEW`) are still referenced.
-- **Fix:** Standardize to canonical filenames and remove stale references.
+- **Failure means:** Legacy prompt filenames or naming drift is still referenced in app source files.
+- **Fix:** Remove all legacy prompt filename references from app code. Use generic language in validation text -- never embed the exact filenames being checked for.
 
 ## Check 13: No mixed bridge imports
 
@@ -93,7 +93,8 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 
 - **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability. Must match NFL resolution behavior.
 - **Failure means:** One or more of: configId missing from SyncPayload, no fallbackConfigId param in sync machine, no native override path (`configId ?? fallbackConfigId`), or setUser doesn't accept resolvedConfigId.
-- **Fix:** Resolution order must be: native detail.configId (if present) > explicit web configId > template fallback. Ensure SyncPayload includes configId, createSyncStateMachine accepts fallbackConfigId, applyIncomingSync resolves `configId ?? fallbackConfigId`, and setUser receives the resolved value.
+- **Fix:** Dynamic configId must come from native detail override, explicit web value, or env-backed fallback. Hardcoded literals are allowed only as documented template fallback defaults.
+- Pass when config resolution order is: native detail.configId -> explicit web configId -> env-backed fallback configId.
 - Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 
