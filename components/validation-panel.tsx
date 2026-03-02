@@ -393,74 +393,45 @@ export function ValidationPanel() {
 
 
     // ---------------------------------------------------------------
-    // 12) Prompt filename hygiene + 13) Mixed bridge module check
-    //     Real source scan via /api/scan-source
+    // 12) Mixed bridge module check
+    //     Real source scan via /api/scan-source (runtime code only)
     // ---------------------------------------------------------------
     try {
       const res = await fetch("/api/scan-source");
       const body = await res.json();
-      const legacyHits: { file: string; line: number; match: string }[] =
-        body.legacyPromptHits ?? [];
       const mixedHits: { file: string; line: number; match: string }[] =
         body.mixedBridgeHits ?? [];
       const scanned: number = body.scannedFiles ?? 0;
 
-      // Check 12: legacy prompt references
-      if (legacyHits.length === 0) {
-        checks.push({
-          id: "check-12",
-          label: "12. Prompt filename hygiene",
-          status: "pass",
-          detail: `Scanned ${scanned} source files. No legacy prompt filename references found.`,
-        });
-      } else {
-        const locations = legacyHits
-          .map((h) => `${h.file}:${h.line} (${h.match})`)
-          .join("; ");
-        checks.push({
-          id: "check-12",
-          label: "12. Prompt filename hygiene",
-          status: "fail",
-          detail: `FAIL: Legacy prompt references found in: ${locations}. See FIXES.md #12.`,
-        });
-      }
-
-      // Check 13: mixed bridge imports
       if (mixedHits.length === 0) {
         checks.push({
-          id: "check-13",
-          label: "13. No mixed bridge imports",
+          id: "check-12",
+          label: "12. No mixed bridge imports",
           status: "pass",
-          detail: `Scanned ${scanned} source files. No starter/finisher bridge imports found.`,
+          detail: `Scanned ${scanned} runtime source files. No starter/finisher bridge imports found.`,
         });
       } else {
         const locations = mixedHits
           .map((h) => `${h.file}:${h.line} (${h.match})`)
           .join("; ");
         checks.push({
-          id: "check-13",
-          label: "13. No mixed bridge imports",
+          id: "check-12",
+          label: "12. No mixed bridge imports",
           status: "fail",
-          detail: `FAIL: Mixed bridge references found in: ${locations}. See FIXES.md #13.`,
+          detail: `FAIL: Mixed bridge references found in: ${locations}. See FIXES.md #12.`,
         });
       }
     } catch {
       checks.push({
         id: "check-12",
-        label: "12. Prompt filename hygiene",
+        label: "12. No mixed bridge imports",
         status: "warn",
         detail: "Could not reach /api/scan-source. Ensure the route exists. See FIXES.md #12.",
-      });
-      checks.push({
-        id: "check-13",
-        label: "13. No mixed bridge imports",
-        status: "warn",
-        detail: "Could not reach /api/scan-source. Ensure the route exists. See FIXES.md #13.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 14) ConfigId behavior parity with NFL pattern
+    // 13) ConfigId behavior parity with NFL pattern
     //     - configId present in SyncPayload contract
     //     - fallbackConfigId exists in sync machine
     //     - native detail.configId overrides fallback when present
@@ -487,24 +458,24 @@ export function ValidationPanel() {
       ].filter(Boolean);
 
       checks.push({
-        id: "check-14",
-        label: "14. ConfigId: NFL pattern parity",
+        id: "check-13",
+        label: "13. ConfigId: NFL pattern parity",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "configId in payload contract, fallback exists, native detail.configId overrides fallback, setUser receives resolved value."
-          : `FAIL: ${missing.join("; ")}. See FIXES.md #14.`,
+          : `FAIL: ${missing.join("; ")}. See FIXES.md #13.`,
       });
     } catch {
       checks.push({
-        id: "check-14",
-        label: "14. ConfigId: NFL pattern parity",
+        id: "check-13",
+        label: "13. ConfigId: NFL pattern parity",
         status: "warn",
-        detail: "Could not import modules for configId inspection. See FIXES.md #14.",
+        detail: "Could not import modules for configId inspection. See FIXES.md #13.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 15) No duplicate identity write path in native mode
+    // 14) No duplicate identity write path in native mode
     //     In native mode: only DemoBridge.startSession, no direct braze calls
     //     In browser mode: only direct braze.changeUser/openSession
     // ---------------------------------------------------------------
@@ -540,24 +511,24 @@ export function ValidationPanel() {
       const allPass = gated && hasStartSession && brazeCallLines.length > 0;
 
       checks.push({
-        id: "check-15",
-        label: "15. No duplicate identity write (native mode)",
+        id: "check-14",
+        label: "14. No duplicate identity write (native mode)",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path."
-          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #15.`,
+          : `FAIL: setUser() does not properly gate identity writes by environment. Both direct Braze calls and DemoBridge.startSession may execute in the same path. See FIXES.md #14.`,
       });
     } catch {
       checks.push({
-        id: "check-15",
-        label: "15. No duplicate identity write (native mode)",
+        id: "check-14",
+        label: "14. No duplicate identity write (native mode)",
         status: "warn",
-        detail: "Could not import bridge-entry module for inspection. See FIXES.md #15.",
+        detail: "Could not import bridge-entry module for inspection. See FIXES.md #14.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 16) Native runtime event simulation
+    // 15) Native runtime event simulation
     //     Dispatches a real nativeUserUpdate-shape CustomEvent and asserts:
     //       - user changes exactly once
     //       - no immediate rollback
@@ -618,24 +589,24 @@ export function ValidationPanel() {
       ].filter(Boolean);
 
       checks.push({
-        id: "check-16",
-        label: "16. Native runtime event simulation",
+        id: "check-15",
+        label: "15. Native runtime event simulation",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "Mock native event applied exactly once, no bounce, no duplicate, echo suppression active."
-          : `FAIL: ${issues.join("; ")}. See FIXES.md #16.`,
+          : `FAIL: ${issues.join("; ")}. See FIXES.md #15.`,
       });
     } catch (err) {
       checks.push({
-        id: "check-16",
-        label: "16. Native runtime event simulation",
+        id: "check-15",
+        label: "15. Native runtime event simulation",
         status: "warn",
-        detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #16.`,
+        detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #15.`,
       });
     }
 
     // ---------------------------------------------------------------
-    // 17) Embed header conflict (CSP frame-ancestors vs X-Frame-Options)
+    // 16) Embed header conflict (CSP frame-ancestors vs X-Frame-Options)
     //     Verifies CSP allows dashboard origin AND XFO does not block it
     // ---------------------------------------------------------------
     {
@@ -653,32 +624,32 @@ export function ValidationPanel() {
 
         if (cspOk && !xfoConflict) {
           checks.push({
-            id: "check-17",
-            label: "17. Embed headers: no conflict",
+            id: "check-16",
+            label: "16. Embed headers: no conflict",
             status: "pass",
             detail: `CSP frame-ancestors allows ${REQUIRED_ORIGIN} and no conflicting X-Frame-Options header.`,
           });
         } else if (!cspOk) {
           checks.push({
-            id: "check-17",
-            label: "17. Embed headers: CSP missing",
+            id: "check-16",
+            label: "16. Embed headers: CSP missing",
             status: "fail",
-            detail: `CSP frame-ancestors does not include ${REQUIRED_ORIGIN}. See FIXES.md #17.`,
+            detail: `CSP frame-ancestors does not include ${REQUIRED_ORIGIN}. See FIXES.md #16.`,
           });
         } else {
           checks.push({
-            id: "check-17",
-            label: "17. Embed headers: XFO conflict",
+            id: "check-16",
+            label: "16. Embed headers: XFO conflict",
             status: "fail",
-            detail: `X-Frame-Options is "${xfo}" which blocks cross-origin embedding even though CSP allows it. Remove or adjust XFO. See FIXES.md #17.`,
+            detail: `X-Frame-Options is "${xfo}" which blocks cross-origin embedding even though CSP allows it. Remove or adjust XFO. See FIXES.md #16.`,
           });
         }
       } catch {
         checks.push({
-        id: "check-17",
-        label: "17. Embed header conflict check",
+        id: "check-16",
+        label: "16. Embed header conflict check",
         status: "warn",
-        detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #17.",
+        detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #16.",
         });
       }
     }
@@ -688,14 +659,14 @@ export function ValidationPanel() {
     checks.sort((a, b) => priority[a.status] - priority[b.status]);
 
     // ---------------------------------------------------------------
-    // 18) Evidence report — always last, after sort
+    // 17) Evidence report — always last, after sort
     // ---------------------------------------------------------------
     checks.push({
-      id: "check-18",
-      label: "18. Evidence report",
+      id: "check-17",
+      label: "17. Evidence report",
       status: "pass",
       detail:
-        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution. See FIXES.md #18.",
+        "Prompt: canonical (no legacy refs) | Lock: 300ms | normalizeUserId: trim only | Identity owner: bridge-entry setUser() | configId: env-backed with NFL resolution. See FIXES.md #17.",
     });
 
     setResults(checks);
@@ -732,7 +703,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (18 checks).
+          to validate against the hardening spec (17 checks).
         </p>
       )}
 

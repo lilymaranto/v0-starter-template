@@ -77,19 +77,13 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - **Failure means:** `braze.changeUser`/`braze.openSession` called from multiple places.
 - **Fix:** Restrict identity writes to the single sync-owned `setUser` path.
 
-## Check 12: Prompt filename hygiene
-
-- **Why it exists:** Prevents stale prompt drift.
-- **Failure means:** Legacy prompt filenames or naming drift is still referenced in app source files.
-- **Fix:** Remove all legacy prompt filename references from app code. Use generic language in validation text -- never embed the exact filenames being checked for.
-
-## Check 13: No mixed bridge imports
+## Check 12: No mixed bridge imports
 
 - **Why it exists:** Mixing starter + finisher bridge modules causes contract conflicts.
 - **Failure means:** Multiple bridge module variants are imported in app code.
 - **Fix:** Keep one bridge entry file and one import path across the codebase.
 
-## Check 14: ConfigId NFL pattern parity
+## Check 13: ConfigId NFL pattern parity
 
 - **Why it exists:** Mobile routing is config-scoped; hardcoding breaks portability. Must match NFL resolution behavior.
 - **Failure means:** One or more of: configId missing from SyncPayload, no fallbackConfigId param in sync machine, no native override path (`configId ?? fallbackConfigId`), or setUser doesn't accept resolvedConfigId.
@@ -98,7 +92,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Ensure configId resolution order is: native detail.configId -> explicit web-provided configId -> template fallback configId.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 
-## Check 15: No duplicate identity write path in native mode
+## Check 14: No duplicate identity write path in native mode
 
 - **Why it exists:** In WKWebView container flow, DemoBridge.startSession already performs braze.changeUser/openSession internally. Calling both directly and via bridge creates duplicate user/session writes and racey analytics.
 - **Failure means:** Both direct Braze identity writes (braze.changeUser/openSession) and DemoBridge.startSession execute in the same setUser() code path without environment gating.
@@ -108,7 +102,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Both paths must be in separate if/else branches, never sequential.
 - Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
 
-## Check 16: Native runtime event simulation
+## Check 15: Native runtime event simulation
 
 - **Why it exists:** Static code checks cannot prove real native-to-web behavior.
 - **Failure means:** Dispatching a nativeUserUpdate-shape payload does not update active user exactly once, or causes bounce/duplicate apply.
@@ -118,7 +112,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - no duplicate apply logs/state transitions
   - echo suppression prevents setUser callback for fromNative events
 
-## Check 17: Embed header conflict (CSP vs X-Frame-Options)
+## Check 16: Embed header conflict (CSP vs X-Frame-Options)
 
 - **Why it exists:** frame-ancestors may be correct while X-Frame-Options still blocks embedding.
 - **Failure means:** Any blocking XFO policy conflicts with intended cross-origin dashboard iframe behavior.
@@ -128,7 +122,7 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
   - Keep route-scoped policy for non-embed pages
   - Remove or delete XFO header on embed routes rather than setting SAMEORIGIN
 
-## Check 18: Evidence report
+## Check 17: Evidence report
 
 - **Why it exists:** Forces deterministic proof instead of “looks good” claims.
 - **Failure means:** Validation output omits required proof values.

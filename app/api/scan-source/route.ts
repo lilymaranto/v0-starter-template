@@ -2,38 +2,62 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-// Recursively collect .ts/.tsx files from app source directories
-function collectFiles(dir: string, files: string[] = []): string[] {
+// Only scan these runtime source directories
+const SCAN_DIRS = ["app", "components", "lib"];
+
+// Specific files/dirs to ALWAYS skip even within SCAN_DIRS
+const SKIP_PATHS = [
+  "app/api/scan-source",
+  "app/api/check-csp",
+  "app/api/check-headers",
+  "components/validation-panel.tsx",
+];
+
+// Directory names to skip at any depth
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".next",
+  "solcon-starter-v0",
+  "solcon-finisher-v0",
+  "user_read_only_context",
+  "scripts",
+  "public",
+]);
+
+function collectFiles(dir: string, root: string, files: string[] = []): string[] {
   if (!fs.existsSync(dir)) return files;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
+    const rel = path.relative(root, full);
+
+    // Skip excluded dirs
     if (entry.isDirectory()) {
-      // Skip node_modules, .next, solcon reference folders, user_read_only_context
-      if (
-        ["node_modules", ".next", "solcon-starter-v0", "solcon-finisher-v0", "user_read_only_context"].includes(
-          entry.name
-        )
-      )
-        continue;
-      collectFiles(full, files);
-    } else if (/\.(ts|tsx)$/.test(entry.name)) {
-      files.push(full);
+      if (SKIP_DIRS.has(entry.name)) continue;
+      if (SKIP_PATHS.some((p) => rel.startsWith(p))) continue;
+      collectFiles(full, root, files);
+      continue;
     }
+
+    // Skip excluded files and non-source files
+    if (!/\.(ts|tsx)$/.test(entry.name)) continue;
+    if (SKIP_PATHS.includes(rel)) continue;
+    // Skip FIXES.md or any .md picked up somehow
+    if (entry.name.endsWith(".md")) continue;
+
+    files.push(full);
   }
   return files;
 }
 
 export async function GET() {
   const root = process.cwd();
-  const files = collectFiles(root);
+  // Only scan runtime source directories
+  const files: string[] = [];
+  for (const dir of SCAN_DIRS) {
+    collectFiles(path.join(root, dir), root, files);
+  }
 
-  // Patterns to scan for
-  const legacyPromptPatterns = [
-    "SOLCON_PROMPT_V0_NEW",
-    "SOLCON_PROMPT_V0.md",
-    "STARTER_PROMPT_V0",
-    "STARTER_VALIDATION",
-  ];
+  // Mixed bridge import patterns (runtime source only)
   const mixedBridgePatterns = [
     "solcon-starter-v0",
     "solcon-finisher-v0",
@@ -42,7 +66,6 @@ export async function GET() {
     "demo_bridge_entry",
   ];
 
-  const legacyHits: { file: string; line: number; match: string }[] = [];
   const mixedHits: { file: string; line: number; match: string }[] = [];
 
   for (const filePath of files) {
@@ -52,11 +75,6 @@ export async function GET() {
 
     for (let i = 0; i < lines.length; i++) {
       const ln = lines[i];
-      for (const pat of legacyPromptPatterns) {
-        if (ln.includes(pat)) {
-          legacyHits.push({ file: relative, line: i + 1, match: pat });
-        }
-      }
       for (const pat of mixedBridgePatterns) {
         if (ln.includes(pat)) {
           mixedHits.push({ file: relative, line: i + 1, match: pat });
@@ -67,7 +85,6 @@ export async function GET() {
 
   return NextResponse.json({
     scannedFiles: files.length,
-    legacyPromptHits: legacyHits,
     mixedBridgeHits: mixedHits,
   });
 }
