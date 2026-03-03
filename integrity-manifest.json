@@ -1,6 +1,6 @@
 {
   "lib/braze.ts": "68f2f67695984ddc6fec7064e6390ade89b1f7df0a64484ab891478c79cce06f",
-  "lib/bridge-entry.ts": "6cd56e3e6f2b477c70b8a78baeea7a740e3d4a5627f50645f80ea457fd737a14",
+  "lib/bridge-entry.ts": "a981a4e644e1804107c0f02f044bd0b9b425b61fb744f88a95a7cd452bf983d6",
   "lib/sync-state.ts": "4724ece9ac7b16849b4506dcd26a19b339729a8c94ffadc97796b93651d1d041",
   "lib/track-event.ts": "8f9aada1dd289b8b363ea301136d0183c5778bb6339c0c0a3ca1ba719eb43afe",
   "middleware.ts": "c216d67c99c5a56e95f3780a0c92b1154042b23f4e6b813fe4ae497163a896bc"
