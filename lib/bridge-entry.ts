@@ -80,16 +80,17 @@ export function startWebSession({
 //   BROWSER MODE: no bridge publish
 //
 // Braze identity enforcement:
-//   Always attempt changeUser/openSession safely in setUser owner path.
-export async function setUser(userId: string, reason = "manual", resolvedConfigId?: string) {
+//   Browser fallback only, so native mode does not double-write identity.
+export async function setUser(
+  userId: string,
+  reason = "manual",
+  resolvedConfigId?: string
+) {
   if (!userId) return;
 
   if (resolvedConfigId) {
     currentConfigId = resolvedConfigId;
   }
-
-  // Enforce Braze identity in owner path, but never fail app if SDK unavailable.
-  await applyBrazeIdentitySafely(userId);
 
   // Environment-gated bridge publish: native branch publishes, browser branch does not.
   if (hasBridge() && window.DemoBridge?.startSession) {
@@ -106,7 +107,8 @@ export async function setUser(userId: string, reason = "manual", resolvedConfigI
       console.warn("[Bridge] startSession failed:", error);
     }
   } else {
-    // Browser fallback: Braze identity already handled above.
+    // Browser fallback: enforce Braze identity safely (no bridge available).
+    await applyBrazeIdentitySafely(userId);
   }
 }
 
