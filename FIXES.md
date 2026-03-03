@@ -92,17 +92,18 @@ v0: ALWAYS read this file before attempting to fix any validation failure.
 - Hard fail if configId is removed from payload contract or if native detail.configId cannot override fallback.
 - **Source of truth:** Structural invariants from `/api/scan-source` (no `toString()` inspection).
 
-## Check 14: No duplicate identity write path in native mode
+## Check 14: Identity owner path + gated bridge publish
 
-- **Why it exists:** In WKWebView container flow, DemoBridge.startSession already performs braze.changeUser/openSession internally. Calling both directly and via bridge creates duplicate user/session writes and racey analytics.
-- **Failure means:** Both direct Braze identity writes (braze.changeUser/openSession) and DemoBridge.startSession execute in the same setUser() code path without environment gating.
-- **Fix:** Gate setUser() by environment:
-  - Native mode (window.DemoBridge.startSession available): bridge session write only, do NOT call braze.changeUser/openSession directly.
-  - Browser fallback mode (no bridge): direct Braze identity write only.
-- Both paths must be in separate if/else branches, never sequential.
-- Hard fail if both direct Braze identity write and DemoBridge.startSession execute in the same native setUser path.
-- **When Braze placeholders are present** (check 0 fail), check 14 downgrades to WARN with advisory message. Identity gating is informational until Braze config is finalized.
-- **Source of truth:** Structural invariants from `/api/scan-source` (no `toString()` inspection).
+- **Why it exists:** Ensures identity writes stay centralized in `setUser()` and bridge session publish remains controlled by environment, while preserving safe runtime behavior when SDK/bridge availability differs.
+- **Failure means:** `setUser()` is no longer environment-gated for bridge publish, or required owner-path invariants are missing.
+- **Fix:**
+  - Keep `setUser()` as the single identity owner path in `lib/bridge-entry.ts`.
+  - Keep bridge publish gated:
+    - Native mode (`window.DemoBridge.startSession` available): publish via `DemoBridge.startSession(...)`.
+    - Browser mode (no bridge): do not bridge-publish.
+  - Ensure Braze identity write calls remain owned by `setUser()` and are guarded so missing/uninitialized SDK does not crash app.
+- **When Braze placeholders are present** (Check 0 fail), this check may downgrade to WARN and remain informational until Braze config is finalized.
+- **Source of truth:** Structural invariants from `/api/scan-source`.
 
 ## Check 15: Native runtime event simulation
 

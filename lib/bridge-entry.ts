@@ -41,6 +41,20 @@ function hasBridge(): boolean {
   return available;
 }
 
+// Safe identity write: never throws if SDK is missing/uninitialized.
+async function applyBrazeIdentitySafely(userId: string) {
+  try {
+    const braze = await getBraze();
+    if (!braze) return;
+    if (typeof braze.changeUser !== "function") return;
+    if (typeof braze.openSession !== "function") return;
+    braze.changeUser(userId);
+    braze.openSession();
+  } catch (error) {
+    console.warn("[Bridge] Braze identity write skipped:", error);
+  }
+}
+
 export function startWebSession({
   userId,
   configId,
@@ -61,37 +75,38 @@ export function startWebSession({
 // configId comes from the sync-state resolver (NFL pattern):
 //   native detail.configId > explicit web configId > template fallback
 //
-// Environment-gated to prevent duplicate identity writes:
-//   NATIVE MODE:  DemoBridge.startSession only (bridge handles braze internally)
-//   BROWSER MODE: braze.changeUser + openSession directly (no bridge available)
+// Environment-gated bridge write to avoid native bounce loops:
+//   NATIVE MODE:  publish via DemoBridge.startSession
+//   BROWSER MODE: no bridge publish
+//
+// Braze identity enforcement:
+//   Always attempt changeUser/openSession safely in setUser owner path.
 export async function setUser(userId: string, reason = "manual", resolvedConfigId?: string) {
   if (!userId) return;
 
-  // Update the module-level configId if a new one was resolved
   if (resolvedConfigId) {
     currentConfigId = resolvedConfigId;
   }
 
-  // Environment-gated: native bridge OR direct Braze, never both
+  // Enforce Braze identity in owner path, but never fail app if SDK unavailable.
+  await applyBrazeIdentitySafely(userId);
+
+  // Environment-gated bridge publish: native branch publishes, browser branch does not.
   if (hasBridge() && window.DemoBridge?.startSession) {
-    // NATIVE MODE: bridge session write only.
-    // DemoBridge.startSession already performs braze.changeUser/openSession
-    // internally inside the WKWebView container -- do NOT call them here.
-    if (currentConfigId && window.DemoBridge?.setConfigId) {
-      window.DemoBridge.setConfigId(currentConfigId);
+    try {
+      if (currentConfigId && window.DemoBridge?.setConfigId) {
+        window.DemoBridge.setConfigId(currentConfigId);
+      }
+      window.DemoBridge.startSession({
+        userId,
+        configId: currentConfigId,
+        reason,
+      });
+    } catch (error) {
+      console.warn("[Bridge] startSession failed:", error);
     }
-    window.DemoBridge.startSession({
-      userId,
-      configId: currentConfigId,
-      reason,
-    });
   } else {
-    // BROWSER FALLBACK: direct Braze identity write (no bridge available)
-    const braze = await getBraze();
-    if (braze) {
-      braze.changeUser(userId);
-      braze.openSession();
-    }
+    // Browser fallback: Braze identity already handled above.
   }
 }
 
