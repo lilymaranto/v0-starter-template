@@ -491,9 +491,7 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 14) No duplicate identity write path in native mode (uses structural invariants)
-    //     Checks bridge-entry.ts has environment gating with separate branches.
-    //     When Braze placeholders detected (check 0 fail), downgrades to warn.
+    // 14) Identity owner path enforced + bridge publish remains gated
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
       const bridgeInv = scanData.structuralInvariants.find((i) => i.file === "lib/bridge-entry.ts");
@@ -512,21 +510,22 @@ export function ValidationPanel() {
       if (missing.length === 0) {
         checks.push({
           id: "check-14",
-          label: "14. No duplicate identity write (native mode)",
+          label: "14. Identity owner path + gated bridge publish",
           status: "pass",
-          detail: "setUser() is environment-gated: native mode uses DemoBridge.startSession only, browser fallback uses direct Braze identity writes only. No duplicate path.",
+          detail:
+            "setUser() remains the single identity owner path, and bridge publish is still environment-gated (native branch publishes via DemoBridge.startSession; browser branch does not).",
         });
       } else if (brazePlaceholder) {
         checks.push({
           id: "check-14",
-          label: "14. No duplicate identity write (native mode)",
+          label: "14. Identity owner path + gated bridge publish",
           status: "warn",
-          detail: `Braze placeholders detected; identity gating check is informational until Braze config is finalized. Missing: ${missing.join("; ")}. See FIXES.md #14.`,
+          detail: `Braze placeholders detected; check is informational until Braze config is finalized. Missing: ${missing.join("; ")}. See FIXES.md #14.`,
         });
       } else {
         checks.push({
           id: "check-14",
-          label: "14. No duplicate identity write (native mode)",
+          label: "14. Identity owner path + gated bridge publish",
           status: "fail",
           detail: `FAIL: ${missing.join("; ")}. See FIXES.md #14.`,
         });
@@ -534,9 +533,9 @@ export function ValidationPanel() {
     } else {
       checks.push({
         id: "check-14",
-        label: "14. No duplicate identity write (native mode)",
+        label: "14. Identity owner path + gated bridge publish",
         status: "warn",
-        detail: "Could not reach /api/scan-source for identity gating inspection. See FIXES.md #14.",
+        detail: "Could not reach /api/scan-source for identity/gating inspection. See FIXES.md #14.",
       });
     }
 
