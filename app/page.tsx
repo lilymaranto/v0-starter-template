@@ -69,11 +69,10 @@ export default function Home() {
       <nav className="mb-5 flex w-full rounded-lg bg-secondary p-1" aria-label="Tabs">
         <button
           onClick={() => setActiveTab("app")}
-          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-            activeTab === "app"
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${activeTab === "app"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
-          }`}
+            }`}
           aria-selected={activeTab === "app"}
           role="tab"
         >
@@ -81,11 +80,10 @@ export default function Home() {
         </button>
         <button
           onClick={() => setActiveTab("validation")}
-          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-            activeTab === "validation"
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${activeTab === "validation"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
-          }`}
+            }`}
           aria-selected={activeTab === "validation"}
           role="tab"
         >
@@ -114,6 +112,9 @@ export default function Home() {
             <ol className="flex flex-col gap-1.5 text-xs text-muted-foreground leading-relaxed">
               <li>
                 <span className="font-mono text-foreground">1.</span> Edit this page -- Braze + bridge wiring is pre-connected.
+                <p className="mt-1 pl-4 italic">
+                  Keep the existing infrastructure, all files in lib, and the validation checklist unchanged until the end. You may update the UI, and in braze.ts you may modify only BRAZE_API_KEY and BRAZE_BASE_URL. Help me build..
+                </p>
               </li>
               <li>
                 <span className="font-mono text-foreground">2.</span> Use the user dropdown below or remove it if you only need one user.
