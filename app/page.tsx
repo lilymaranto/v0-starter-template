@@ -15,6 +15,11 @@ type Tab = "app" | "validation";
 export default function Home() {
   const [activeUser, setActiveUser] = useState<string>(DEFAULT_USER);
   const [activeTab, setActiveTab] = useState<Tab>("app");
+
+  // Build dynamic options to include activeUser if not in base USERS list
+  const selectUsers = USERS.includes(activeUser as (typeof USERS)[number])
+    ? [...USERS]
+    : [activeUser, ...USERS];
   const syncRef = useRef<ReturnType<typeof createSyncStateMachine> | null>(null);
   const initialized = useRef(false);
 
@@ -33,11 +38,18 @@ export default function Home() {
     syncRef.current = sync;
 
     initBraze().then(() => {
-      startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
-      sync.applyIncomingSync({
-        userId: DEFAULT_USER,
-        reason: "default",
-      });
+      const hasBridge =
+        typeof window !== "undefined" && Boolean((window as any).DemoBridge);
+
+      // Only force default user in pure browser fallback.
+      // If bridge exists, let sync/native flow own startup identity.
+      if (!hasBridge) {
+        startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
+        sync.applyIncomingSync({
+          userId: DEFAULT_USER,
+          reason: "default",
+        });
+      }
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
@@ -151,7 +163,7 @@ export default function Home() {
                 onChange={(e) => handleChangeUser(e.target.value)}
                 className="w-full appearance-none rounded-lg border border-border bg-secondary px-3 py-2 pr-8 text-sm font-semibold text-secondary-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                {USERS.map((user) => (
+                {selectUsers.map((user) => (
                   <option key={user} value={user}>
                     {user}
                   </option>

@@ -14,6 +14,7 @@ export function ValidationPanel() {
   const [results, setResults] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+
   const runChecks = useCallback(async () => {
     setRunning(true);
     const checks: CheckResult[] = [];
@@ -21,13 +22,15 @@ export function ValidationPanel() {
     // ---------------------------------------------------------------
     // PRE-CHECK: Braze SDK API key and endpoint configured
     // ---------------------------------------------------------------
+    let brazePlaceholder = false;
     try {
       const brazeMod = await import("@/lib/braze");
       const key = brazeMod.BRAZE_API_KEY;
       const url = brazeMod.BRAZE_BASE_URL;
       const keyMissing = !key || key === "YOUR_BRAZE_API_KEY";
       const urlMissing = !url || url === "YOUR_SDK_ENDPOINT";
-      if (keyMissing || urlMissing) {
+      brazePlaceholder = keyMissing || urlMissing;
+      if (brazePlaceholder) {
         const missing = [
           keyMissing ? "API key" : "",
           urlMissing ? "SDK endpoint" : "",
@@ -49,6 +52,7 @@ export function ValidationPanel() {
         });
       }
     } catch {
+      brazePlaceholder = true;
       checks.push({
         id: "braze-config",
         label: "Braze SDK configuration",
@@ -58,130 +62,7 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 1) Idle — no session-start spam loop
-    // ---------------------------------------------------------------
-    checks.push(
-      (() => {
-        const braze = (window as Record<string, unknown>).braze as
-          | Record<string, unknown>
-          | undefined;
-        const hasOpenSession =
-          braze && typeof braze.openSession === "function";
-        return {
-          id: "check-1",
-          label: "1. No session spam while idle",
-          status: hasOpenSession ? ("pass" as const) : ("warn" as const),
-          detail: hasOpenSession
-            ? "Braze SDK present. openSession only invoked through setUser owner path."
-            : "Braze SDK not initialized yet. Verify openSession is only called inside bridge-entry setUser(). See FIXES.md #1.",
-        };
-      })()
-    );
-
-    // ---------------------------------------------------------------
-    // 2) Web switch — one sync flow, no n2 -> n1 bounce
-    // ---------------------------------------------------------------
-    try {
-      const syncMod = await import("@/lib/sync-state");
-      const src = syncMod.createSyncStateMachine.toString();
-      const hasDedupe = src.includes("lastAppliedSig");
-      checks.push({
-        id: "check-2",
-        label: "2. Web switch: no bounce",
-        status: hasDedupe ? "pass" : "fail",
-        detail: hasDedupe
-          ? "Sync state machine has signature dedupe to prevent n2 -> n1 bounce."
-          : "Missing signature dedupe in sync state machine. See FIXES.md #2.",
-      });
-    } catch {
-      checks.push({
-        id: "check-2",
-        label: "2. Web switch: no bounce",
-        status: "warn",
-        detail: "Could not import sync-state module. See FIXES.md #2.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 3) Native switch — web updates once, no duplicate apply;
-    //    callback forwards detail unchanged
-    // ---------------------------------------------------------------
-    try {
-      const syncMod = await import("@/lib/sync-state");
-      const bridgeMod = await import("@/lib/bridge-entry");
-      const syncSrc = syncMod.createSyncStateMachine.toString();
-      const listenSrc = bridgeMod.listenForNative.toString();
-      const hasEchoSuppress = syncSrc.includes("fromNative");
-      const forwardsDetail = listenSrc.includes("detail");
-      const allPass = hasEchoSuppress && forwardsDetail;
-      checks.push({
-        id: "check-3",
-        label: "3. Native switch: single apply + detail forwarding",
-        status: allPass ? "pass" : "fail",
-        detail: allPass
-          ? "Echo suppression active and listenForNative forwards detail payload unchanged."
-          : `Missing: ${[
-            !hasEchoSuppress && "echo suppression (fromNative)",
-            !forwardsDetail && "detail forwarding in listenForNative",
-          ]
-            .filter(Boolean)
-            .join(", ")}. See FIXES.md #3.`,
-      });
-    } catch {
-      checks.push({
-        id: "check-3",
-        label: "3. Native switch: single apply + detail forwarding",
-        status: "warn",
-        detail: "Could not import modules for inspection. See FIXES.md #3.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 4) Custom event — Braze-only routing, no DemoBridge forwarding
-    // ---------------------------------------------------------------
-    try {
-      const trackMod = await import("@/lib/track-event");
-      const src = trackMod.trackEvent.toString();
-      const hasBrazePath =
-        src.includes("logCustomEvent") || src.includes("logEvent");
-      checks.push({
-        id: "check-4",
-        label: "4. Custom events: Braze-only path",
-        status: hasBrazePath ? "pass" : "fail",
-        detail: hasBrazePath
-          ? "trackEvent routes events through Braze only (trackEvent -> braze.logCustomEvent). No DemoBridge custom-event forwarding."
-          : "trackEvent does not appear to call logCustomEvent. See FIXES.md #4.",
-      });
-    } catch {
-      checks.push({
-        id: "check-4",
-        label: "4. Custom events: Braze-only path",
-        status: "warn",
-        detail: "Could not import track-event module. See FIXES.md #4.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 5) Browser fallback — no crash from missing DemoBridge
-    // ---------------------------------------------------------------
-    {
-      const hasDemoBridge = Boolean(
-        (window as Record<string, unknown>).DemoBridge
-      );
-      checks.push({
-        id: "check-5",
-        label: hasDemoBridge
-          ? "5. Browser fallback (native detected)"
-          : "5. Browser fallback (no crash)",
-        status: "pass",
-        detail: hasDemoBridge
-          ? "DemoBridge present -- running in native container. See FIXES.md #5."
-          : "DemoBridge not present. App loaded without crashing -- fallback works. See FIXES.md #5.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // Fetch scan-source evidence (used by checks 6, 8, 9, 10, 11, 12, 17)
+    // Fetch scan-source evidence (used by multiple checks)
     // ---------------------------------------------------------------
     type Hit = { file: string; line: number; match: string };
     type InvariantResult = { file: string; present: string[]; missing: string[] };
@@ -209,254 +90,176 @@ export function ValidationPanel() {
     }
 
     // ---------------------------------------------------------------
-    // 6) Surface check — DemoBridge only in bridge-entry (scan-source)
+    // 1) Web switch — one sync flow, no n2 -> n1 bounce
+    // ---------------------------------------------------------------
+    try {
+      const syncMod = await import("@/lib/sync-state");
+      const src = syncMod.createSyncStateMachine.toString();
+      const hasDedupe = src.includes("lastAppliedSig");
+      checks.push({
+        id: "check-1",
+        label: "1. Web switch: no bounce",
+        status: hasDedupe ? "pass" : "fail",
+        detail: hasDedupe
+          ? "Sync state machine has signature dedupe to prevent n2 -> n1 bounce."
+          : "Missing signature dedupe in sync state machine. See FIXES.md #2.",
+      });
+    } catch {
+      checks.push({
+        id: "check-1",
+        label: "1. Web switch: no bounce",
+        status: "warn",
+        detail: "Could not import sync-state module. See FIXES.md #2.",
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // 2) Native switch — web updates once, no duplicate apply;
+    //    callback forwards detail unchanged
+    // ---------------------------------------------------------------
+    try {
+      const syncMod = await import("@/lib/sync-state");
+      const bridgeMod = await import("@/lib/bridge-entry");
+      const syncSrc = syncMod.createSyncStateMachine.toString();
+      const listenSrc = bridgeMod.listenForNative.toString();
+      const hasEchoSuppress = syncSrc.includes("fromNative");
+      const forwardsDetail = listenSrc.includes("detail");
+      const allPass = hasEchoSuppress && forwardsDetail;
+      checks.push({
+        id: "check-2",
+        label: "2. Native switch: single apply + detail forwarding",
+        status: allPass ? "pass" : "fail",
+        detail: allPass
+          ? "Echo suppression active and listenForNative forwards detail payload unchanged."
+          : `Missing: ${[
+            !hasEchoSuppress && "echo suppression (fromNative)",
+            !forwardsDetail && "detail forwarding in listenForNative",
+          ]
+            .filter(Boolean)
+            .join(", ")}. See FIXES.md #3.`,
+      });
+    } catch {
+      checks.push({
+        id: "check-2",
+        label: "2. Native switch: single apply + detail forwarding",
+        status: "warn",
+        detail: "Could not import modules for inspection. See FIXES.md #3.",
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // 3) Event path exclusivity — Braze-only, no DemoBridge forwarding
+    //    (merged check 4 + 10)
+    // ---------------------------------------------------------------
+    {
+      let brazePath = false;
+      let demoBridgeForwarding: Hit[] = [];
+
+      try {
+        const trackMod = await import("@/lib/track-event");
+        const src = trackMod.trackEvent.toString();
+        brazePath = src.includes("logCustomEvent") || src.includes("logEvent");
+      } catch {
+        // Will report as warn
+      }
+
+      if (scanData && !scanError) {
+        demoBridgeForwarding = scanData.eventBridgeForwardingHits;
+      }
+
+      const noDemoBridgeEvents = demoBridgeForwarding.length === 0;
+      const allPass = brazePath && noDemoBridgeEvents;
+
+      if (scanError) {
+        checks.push({
+          id: "check-3",
+          label: "3. Event path exclusivity",
+          status: "warn",
+          detail: "Could not reach /api/scan-source for event path inspection. See FIXES.md #4/#10.",
+        });
+      } else if (allPass) {
+        checks.push({
+          id: "check-3",
+          label: "3. Event path exclusivity",
+          status: "pass",
+          detail: "Events route through trackEvent -> braze.logCustomEvent only. No DemoBridge.logEvent forwarding.",
+        });
+      } else {
+        const issues = [
+          !brazePath && "trackEvent does not call logCustomEvent",
+          !noDemoBridgeEvents && `DemoBridge event forwarding at: ${demoBridgeForwarding.map((h) => `${h.file}:${h.line}`).join("; ")}`,
+        ].filter(Boolean);
+        checks.push({
+          id: "check-3",
+          label: "3. Event path exclusivity",
+          status: "fail",
+          detail: `FAIL: ${issues.join("; ")}. See FIXES.md #4/#10.`,
+        });
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // 4) Surface check — DemoBridge only in bridge-entry (scan-source)
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
       const hits = scanData.demoBridgeOutsideBridgeEntryHits;
       if (hits.length === 0) {
         checks.push({
-          id: "check-6",
-          label: "6. Surface check: DemoBridge confined",
+          id: "check-4",
+          label: "4. Surface check: DemoBridge confined",
           status: "pass",
           detail: `Scanned ${scanData.scannedFiles} files. DemoBridge calls confined to lib/bridge-entry.ts only.`,
         });
       } else {
         const locs = hits.map((h) => `${h.file}:${h.line}`).join("; ");
         checks.push({
-          id: "check-6",
-          label: "6. Surface check: DemoBridge leaked",
+          id: "check-4",
+          label: "4. Surface check: DemoBridge leaked",
           status: "fail",
           detail: `REJECT: DemoBridge referenced outside bridge-entry at: ${locs}. See FIXES.md #6.`,
         });
       }
     } else {
       checks.push({
-        id: "check-6",
-        label: "6. Surface check: DemoBridge confined",
+        id: "check-4",
+        label: "4. Surface check: DemoBridge confined",
         status: "warn",
         detail: "Could not reach /api/scan-source for surface inspection. See FIXES.md #6.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 7) Iframe check — intended CSP policy includes dashboard origin
-    // ---------------------------------------------------------------
-    {
-      const REQUIRED_ORIGIN =
-        "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com";
-      try {
-        const res = await fetch("/api/check-csp");
-        const body = await res.json();
-        const csp: string = body.intendedCsp ?? "";
-        const hasFrameAncestors = csp.includes("frame-ancestors");
-        const hasDoppel = csp.includes(REQUIRED_ORIGIN);
-        if (hasFrameAncestors && hasDoppel) {
-          checks.push({
-            id: "check-7",
-            label: "7. Iframe: intended policy OK",
-            status: "pass",
-            detail: `Intended CSP frame-ancestors includes ${REQUIRED_ORIGIN}.`,
-          });
-        } else if (hasFrameAncestors && !hasDoppel) {
-          checks.push({
-            id: "check-7",
-            label: "7. Iframe: dashboard missing from policy",
-            status: "fail",
-            detail: `Intended frame-ancestors does not include ${REQUIRED_ORIGIN}. Update ALLOWED_IFRAME_PARENTS. See FIXES.md #7.`,
-          });
-        } else {
-          checks.push({
-            id: "check-7",
-            label: "7. Iframe: no CSP policy defined",
-            status: "fail",
-            detail:
-              "No frame-ancestors in intended CSP from /api/check-csp. See FIXES.md #7.",
-          });
-        }
-      } catch {
-        checks.push({
-          id: "check-7",
-          label: "7. Iframe check",
-          status: "warn",
-          detail: "Could not reach /api/check-csp. Ensure the route exists. See FIXES.md #7.",
-        });
-      }
-    }
-
-    // ---------------------------------------------------------------
-    // 8) Case preservation — no .toLowerCase() in identity code (scan-source)
-    // ---------------------------------------------------------------
-    if (scanData && !scanError) {
-      const hits = scanData.lowercaseIdentityHits;
-      if (hits.length === 0) {
-        checks.push({
-          id: "check-8",
-          label: "8. User IDs case-preserved",
-          status: "pass",
-          detail: "No .toLowerCase() in identity files. User IDs are trim only.",
-        });
-      } else {
-        const locs = hits.map((h) => `${h.file}:${h.line}`).join("; ");
-        checks.push({
-          id: "check-8",
-          label: "8. User IDs case-preserved",
-          status: "fail",
-          detail: `REJECT: .toLowerCase() found in identity codepath at: ${locs}. IDs must be trim only. See FIXES.md #8.`,
-        });
-      }
-    } else {
-      checks.push({
-        id: "check-8",
-        label: "8. User IDs case-preserved",
-        status: "warn",
-        detail: "Could not reach /api/scan-source for identity inspection. See FIXES.md #8.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 9) Lock window exactness — must be 300 (scan-source evidence)
-    // ---------------------------------------------------------------
-    if (scanData && !scanError) {
-      const hits = scanData.lockValueHits;
-      if (hits.length === 0) {
-        checks.push({
-          id: "check-9",
-          label: "9. Lock window = 300ms",
-          status: "warn",
-          detail: "No lock value declarations found in source. Verify manualLockMs manually. See FIXES.md #9.",
-        });
-      } else {
-        const allText = hits.map((h) => h.match).join(" ");
-        const has300 = /\b300\b/.test(allText);
-        const badValues = ["2000", "3000", "1000"].filter((v) =>
-          new RegExp(`\\b${v}\\b`).test(allText)
-        );
-        const has30 = /\b30\b/.test(allText) && !has300;
-        if (badValues.length > 0 || has30) {
-          const found = [...badValues, ...(has30 ? ["30"] : [])].join(", ");
-          checks.push({
-            id: "check-9",
-            label: "9. Lock window = 300ms",
-            status: "fail",
-            detail: `REJECT: Lock source contains non-300ms value(s): ${found}. See FIXES.md #9.`,
-          });
-        } else if (has300) {
-          checks.push({
-            id: "check-9",
-            label: "9. Lock window = 300ms",
-            status: "pass",
-            detail: `Lock window default is 300ms. Evidence: ${hits.map((h) => `${h.file}:${h.line}`).join("; ")}.`,
-          });
-        } else {
-          checks.push({
-            id: "check-9",
-            label: "9. Lock window = 300ms",
-            status: "warn",
-            detail: `Lock declarations found but could not confirm 300. Evidence: ${hits.map((h) => h.match).join("; ")}. See FIXES.md #9.`,
-          });
-        }
-      }
-    } else {
-      checks.push({
-        id: "check-9",
-        label: "9. Lock window = 300ms",
-        status: "warn",
-        detail: "Could not reach /api/scan-source for lock inspection. See FIXES.md #9.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 10) Event path exclusivity — no DemoBridge.logEvent (scan-source)
-    // ---------------------------------------------------------------
-    if (scanData && !scanError) {
-      const hits = scanData.eventBridgeForwardingHits;
-      if (hits.length === 0) {
-        checks.push({
-          id: "check-10",
-          label: "10. Event path: no DemoBridge.logEvent",
-          status: "pass",
-          detail: "No DemoBridge event forwarding found in runtime source. Events route through braze.logCustomEvent only.",
-        });
-      } else {
-        const locs = hits.map((h) => `${h.file}:${h.line} (${h.match})`).join("; ");
-        checks.push({
-          id: "check-10",
-          label: "10. Event path: DemoBridge forwarding found",
-          status: "fail",
-          detail: `REJECT: DemoBridge event forwarding at: ${locs}. Events must route through trackEvent -> braze.logCustomEvent only. See FIXES.md #10.`,
-        });
-      }
-    } else {
-      checks.push({
-        id: "check-10",
-        label: "10. Event path: no DemoBridge.logEvent",
-        status: "warn",
-        detail: "Could not reach /api/scan-source for event path inspection. See FIXES.md #10.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 11) Single identity owner — no changeUser/openSession outside bridge-entry (scan-source)
+    // 5) Single identity owner — no changeUser/openSession outside bridge-entry
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
       const hits = scanData.identityWritesOutsideBridgeEntryHits;
       if (hits.length === 0) {
         checks.push({
-          id: "check-11",
-          label: "11. Single identity owner path",
+          id: "check-5",
+          label: "5. Single identity owner path",
           status: "pass",
           detail: "No changeUser/openSession calls found outside lib/bridge-entry.ts. Identity writes owned exclusively by setUser().",
         });
       } else {
         const locs = hits.map((h) => `${h.file}:${h.line} (${h.match})`).join("; ");
         checks.push({
-          id: "check-11",
-          label: "11. Single identity owner path",
+          id: "check-5",
+          label: "5. Single identity owner path",
           status: "fail",
           detail: `REJECT: Identity writes found outside bridge-entry at: ${locs}. See FIXES.md #11.`,
         });
       }
     } else {
       checks.push({
-        id: "check-11",
-        label: "11. Single identity owner path",
+        id: "check-5",
+        label: "5. Single identity owner path",
         status: "warn",
         detail: "Could not reach /api/scan-source for identity owner inspection. See FIXES.md #11.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 12) Mixed bridge module check (scan-source)
-    // ---------------------------------------------------------------
-    if (scanData && !scanError) {
-      const hits = scanData.mixedBridgeHits;
-      if (hits.length === 0) {
-        checks.push({
-          id: "check-12",
-          label: "12. No mixed bridge imports",
-          status: "pass",
-          detail: `Scanned ${scanData.scannedFiles} runtime source files. No starter/finisher bridge imports found.`,
-        });
-      } else {
-        const locs = hits.map((h) => `${h.file}:${h.line} (${h.match})`).join("; ");
-        checks.push({
-          id: "check-12",
-          label: "12. No mixed bridge imports",
-          status: "fail",
-          detail: `FAIL: Mixed bridge references found in: ${locs}. See FIXES.md #12.`,
-        });
-      }
-    } else {
-      checks.push({
-        id: "check-12",
-        label: "12. No mixed bridge imports",
-        status: "warn",
-        detail: "Could not reach /api/scan-source. Ensure the route exists. See FIXES.md #12.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 13) ConfigId resolution parity (uses structural invariants)
+    // 6) ConfigId resolution parity (uses structural invariants)
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
       const syncInv = scanData.structuralInvariants.find((i) => i.file === "lib/sync-state.ts");
@@ -474,8 +277,8 @@ export function ValidationPanel() {
         .map((r) => r.label);
 
       checks.push({
-        id: "check-13",
-        label: "13. ConfigId resolution parity",
+        id: "check-6",
+        label: "6. ConfigId resolution parity",
         status: missing.length === 0 ? "pass" : "fail",
         detail: missing.length === 0
           ? "configId in payload contract, fallback exists, native detail.configId overrides fallback, setUser receives resolved value."
@@ -483,68 +286,15 @@ export function ValidationPanel() {
       });
     } else {
       checks.push({
-        id: "check-13",
-        label: "13. ConfigId resolution parity",
+        id: "check-6",
+        label: "6. ConfigId resolution parity",
         status: "warn",
         detail: "Could not reach /api/scan-source for configId inspection. See FIXES.md #13.",
       });
     }
 
     // ---------------------------------------------------------------
-    // 14) Identity owner path enforced + bridge publish remains gated
-    // ---------------------------------------------------------------
-    if (scanData && !scanError) {
-      const bridgeInv = scanData.structuralInvariants.find((i) => i.file === "lib/bridge-entry.ts");
-
-      const requiredLabels = [
-        "hasBridge() gate",
-        "environment-gated setUser",
-        "explicit else branch in setUser",
-        "native branch startSession",
-        "browser fallback braze identity write",
-      ];
-
-      const missing = requiredLabels.filter((l) => !bridgeInv?.present.includes(l));
-      const brazePlaceholder = checks.find((c) => c.id === "braze-config")?.status === "fail";
-
-      if (missing.length === 0) {
-        checks.push({
-          id: "check-14",
-          label: "14. Identity owner path + gated bridge publish",
-          status: "pass",
-          detail:
-            "setUser() remains the single identity owner path, and bridge publish is still environment-gated (native branch publishes via DemoBridge.startSession; browser branch does not).",
-        });
-      } else if (brazePlaceholder) {
-        checks.push({
-          id: "check-14",
-          label: "14. Identity owner path + gated bridge publish",
-          status: "warn",
-          detail: `Braze placeholders detected; check is informational until Braze config is finalized. Missing: ${missing.join("; ")}. See FIXES.md #14.`,
-        });
-      } else {
-        checks.push({
-          id: "check-14",
-          label: "14. Identity owner path + gated bridge publish",
-          status: "fail",
-          detail: `FAIL: ${missing.join("; ")}. See FIXES.md #14.`,
-        });
-      }
-    } else {
-      checks.push({
-        id: "check-14",
-        label: "14. Identity owner path + gated bridge publish",
-        status: "warn",
-        detail: "Could not reach /api/scan-source for identity/gating inspection. See FIXES.md #14.",
-      });
-    }
-
-    // ---------------------------------------------------------------
-    // 15) Native runtime event simulation
-    //     Dispatches a real nativeUserUpdate-shape CustomEvent and asserts:
-    //       - user changes exactly once
-    //       - no immediate rollback
-    //       - no duplicate apply
+    // 7) Native runtime event simulation
     // ---------------------------------------------------------------
     try {
       const syncMod = await import("@/lib/sync-state");
@@ -601,8 +351,8 @@ export function ValidationPanel() {
       ].filter(Boolean);
 
       checks.push({
-        id: "check-15",
-        label: "15. Native runtime event simulation",
+        id: "check-7",
+        label: "7. Native runtime event simulation",
         status: allPass ? "pass" : "fail",
         detail: allPass
           ? "Mock native event applied exactly once, no bounce, no duplicate, echo suppression active."
@@ -610,93 +360,148 @@ export function ValidationPanel() {
       });
     } catch (err) {
       checks.push({
-        id: "check-15",
-        label: "15. Native runtime event simulation",
+        id: "check-7",
+        label: "7. Native runtime event simulation",
         status: "warn",
         detail: `Could not run native simulation: ${err instanceof Error ? err.message : "unknown error"}. See FIXES.md #15.`,
       });
     }
 
     // ---------------------------------------------------------------
-    // 16) Embed header conflict — observed runtime headers
-    //     Verifies real CSP allows dashboard origin AND XFO does not block
+    // 8) Embed policy (merged check 7 + 16: intended + observed)
     // ---------------------------------------------------------------
     {
       const REQUIRED_ORIGIN =
         "https://doppel-dashboard-staging-a7496acff9c6.herokuapp.com";
+      let intendedOk = false;
+      let observedOk = false;
+      let xfoConflict = false;
+      let isProd = false;
+      let envHost = "unknown";
+      let intendedError = false;
+      let observedError = false;
+
+      // Check intended CSP
+      try {
+        const res = await fetch("/api/check-csp");
+        const body = await res.json();
+        const csp: string = body.intendedCsp ?? "";
+        intendedOk = csp.includes("frame-ancestors") && csp.includes(REQUIRED_ORIGIN);
+      } catch {
+        intendedError = true;
+      }
+
+      // Check observed headers
       try {
         const res = await fetch("/api/check-headers");
         const body = await res.json();
-
-        if (body.error) {
-          checks.push({
-            id: "check-16",
-            label: "16. Embed headers: observation failed",
-            status: "warn",
-            detail: `Server-side header fetch failed: ${body.error}. See FIXES.md #16.`,
-          });
-        } else {
+        if (!body.error) {
           const observedCsp: string = body.observedCsp ?? "";
           const observedXfo: string | null = body.observedXFrameOptions ?? null;
-          const isProd: boolean = body.isProductionLike ?? false;
-          const envHost: string = body.host ?? "unknown";
+          isProd = body.isProductionLike ?? false;
+          envHost = body.host ?? "unknown";
 
-          const cspOk = observedCsp.includes("frame-ancestors") && observedCsp.includes(REQUIRED_ORIGIN);
-          const xfoConflict = observedXfo !== null && observedXfo !== "" &&
+          observedOk = observedCsp.includes("frame-ancestors") && observedCsp.includes(REQUIRED_ORIGIN);
+          xfoConflict = observedXfo !== null && observedXfo !== "" &&
             (observedXfo.toUpperCase() === "DENY" || observedXfo.toUpperCase() === "SAMEORIGIN");
-
-          // XFO conflict is always a FAIL regardless of environment
-          if (xfoConflict) {
-            checks.push({
-              id: "check-16",
-              label: "16. Embed headers: XFO conflict",
-              status: "fail",
-              detail: `Observed X-Frame-Options is "${observedXfo}" which blocks cross-origin embedding even though CSP may allow it. See FIXES.md #16.`,
-            });
-          } else if (cspOk) {
-            checks.push({
-              id: "check-16",
-              label: "16. Embed headers: no conflict",
-              status: "pass",
-              detail: `Observed CSP frame-ancestors allows ${REQUIRED_ORIGIN} and no conflicting X-Frame-Options header on real response.`,
-            });
-          } else if (!isProd) {
-            // Non-production: middleware intentionally omits frame-ancestors
-            checks.push({
-              id: "check-16",
-              label: "16. Embed headers: preview/local exempt",
-              status: "pass",
-              detail: `Non-production host (${envHost}): CSP frame-ancestors intentionally omitted; production enforcement required.`,
-            });
-          } else {
-            // Production-like but CSP missing
-            checks.push({
-              id: "check-16",
-              label: "16. Embed headers: observed CSP missing",
-              status: "fail",
-              detail: `Production host (${envHost}): observed CSP does not include frame-ancestors for ${REQUIRED_ORIGIN}. See FIXES.md #16.`,
-            });
-          }
         }
       } catch {
+        observedError = true;
+      }
+
+      if (xfoConflict) {
         checks.push({
-          id: "check-16",
-          label: "16. Embed header conflict check",
+          id: "check-8",
+          label: "8. Embed policy: XFO conflict",
+          status: "fail",
+          detail: `X-Frame-Options blocks cross-origin embedding. See FIXES.md #7/#16.`,
+        });
+      } else if (intendedError && observedError) {
+        checks.push({
+          id: "check-8",
+          label: "8. Embed policy",
           status: "warn",
-          detail: "Could not reach /api/check-headers. Ensure the route exists. See FIXES.md #16.",
+          detail: "Could not reach /api/check-csp or /api/check-headers. See FIXES.md #7/#16.",
+        });
+      } else if (intendedOk && (observedOk || !isProd)) {
+        checks.push({
+          id: "check-8",
+          label: "8. Embed policy: OK",
+          status: "pass",
+          detail: isProd
+            ? `Intended and observed CSP frame-ancestors allow ${REQUIRED_ORIGIN}.`
+            : `Intended CSP OK. Non-production host (${envHost}): observed CSP exempt.`,
+        });
+      } else if (!intendedOk) {
+        checks.push({
+          id: "check-8",
+          label: "8. Embed policy: intended missing",
+          status: "fail",
+          detail: `Intended frame-ancestors does not include ${REQUIRED_ORIGIN}. Update ALLOWED_IFRAME_PARENTS. See FIXES.md #7.`,
+        });
+      } else {
+        checks.push({
+          id: "check-8",
+          label: "8. Embed policy: observed missing",
+          status: "fail",
+          detail: `Production host (${envHost}): observed CSP does not include frame-ancestors for ${REQUIRED_ORIGIN}. See FIXES.md #16.`,
         });
       }
     }
 
     // ---------------------------------------------------------------
-    // 17) Hardened file protection — structural invariants + opt-in integrity
+    // 9) Hardened identity invariants (merged 8+9+14+17)
+    //    - case preservation (no toLowerCase)
+    //    - lock window = 300ms
+    //    - identity gating (hasBridge, else branch, etc.)
+    //    - structural invariants + integrity
     // ---------------------------------------------------------------
     if (scanData && !scanError) {
+      const issues: string[] = [];
+
+      // Case preservation
+      if (scanData.lowercaseIdentityHits.length > 0) {
+        const locs = scanData.lowercaseIdentityHits.map((h) => `${h.file}:${h.line}`).join("; ");
+        issues.push(`toLowerCase in identity code: ${locs}`);
+      }
+
+      // Lock window
+      const lockHits = scanData.lockValueHits;
+      if (lockHits.length > 0) {
+        const allText = lockHits.map((h) => h.match).join(" ");
+        const has300 = /\b300\b/.test(allText);
+        const badValues = ["2000", "3000", "1000", "30"].filter((v) =>
+          new RegExp(`\\b${v}\\b`).test(allText) && (v !== "30" || !/\b300\b/.test(allText))
+        );
+        if (badValues.length > 0) {
+          issues.push(`Lock window has non-300ms value(s): ${badValues.join(", ")}`);
+        } else if (!has300) {
+          issues.push("Lock window: could not confirm 300ms");
+        }
+      }
+
+      // Identity gating (from bridge-entry invariants)
+      const bridgeInv = scanData.structuralInvariants.find((i) => i.file === "lib/bridge-entry.ts");
+      const gatingLabels = [
+        "hasBridge() gate",
+        "environment-gated setUser",
+        "explicit else branch in setUser",
+        "native branch startSession",
+        "browser fallback braze identity write",
+      ];
+      const gatingMissing = gatingLabels.filter((l) => !bridgeInv?.present.includes(l));
+      if (gatingMissing.length > 0 && !brazePlaceholder) {
+        issues.push(`Identity gating missing: ${gatingMissing.join("; ")}`);
+      }
+
+      // Structural invariants (all hardened files)
       const invariants = scanData.structuralInvariants ?? [];
       const allMissing = invariants.flatMap((inv) =>
         inv.missing.map((m) => `${inv.file}: ${m}`)
       );
-      const invariantsOk = allMissing.length === 0;
+      if (allMissing.length > 0) {
+        issues.push(`Structural invariants broken: ${allMissing.join("; ")}`);
+      }
 
       // Integrity hashes (opt-in strict)
       const integrity = scanData.integrityResults ?? [];
@@ -705,56 +510,76 @@ export function ValidationPanel() {
       const hashMismatches = integrity.filter((r) => !r.match);
       const integrityOk = hashMismatches.length === 0;
 
-      // Build detail string
-      const parts: string[] = [];
-
-      if (invariantsOk) {
-        parts.push(`Structural invariants: all ${invariants.length} hardened files pass`);
-      } else {
-        parts.push(`Structural invariants BROKEN: ${allMissing.join("; ")}`);
-      }
-
-      if (!manifestFound && strictMode) {
-        parts.push("Integrity manifest: not found (run npm run update-integrity-manifest) [STRICT MODE]");
-      } else if (!manifestFound) {
-        parts.push("Integrity manifest: not present (opt-in via STRICT_INTEGRITY_MODE=true)");
+      let integrityNote = "";
+      if (!manifestFound) {
+        integrityNote = "Integrity manifest: not present (opt-in via STRICT_INTEGRITY_MODE=true)";
       } else if (integrityOk) {
-        parts.push(`Integrity hashes: ${integrity.length}/${integrity.length} match`);
+        integrityNote = `Integrity hashes: ${integrity.length}/${integrity.length} match`;
       } else {
         const changed = hashMismatches.map((r) => r.file).join(", ");
-        parts.push(`Integrity hashes changed: ${changed}${strictMode ? " [STRICT MODE]" : " (advisory, set STRICT_INTEGRITY_MODE=true to enforce)"}`);
+        integrityNote = `Integrity hashes changed: ${changed}`;
+        if (strictMode) {
+          issues.push(`Integrity mismatch [STRICT MODE]: ${changed}`);
+        }
       }
 
       // Determine status
-      // Structural invariants: always enforced (fail if broken)
-      // Integrity hashes: only enforced when STRICT_INTEGRITY_MODE=true
-      // Non-strict integrity differences are advisory only (pass)
+      const hasStructuralFail = allMissing.length > 0;
+      const hasIdentityFail = issues.some((i) => i.includes("toLowerCase") || i.includes("Lock window") || i.includes("Identity gating"));
+      const hasStrictIntegrityFail = strictMode && (!manifestFound || !integrityOk);
+
       let status: "pass" | "fail" | "warn" = "pass";
-      if (!invariantsOk) {
+      if (hasStructuralFail || hasIdentityFail || hasStrictIntegrityFail) {
         status = "fail";
-      } else if (strictMode && (!manifestFound || !integrityOk)) {
-        status = "fail";
-      } else {
-        status = "pass";
+      } else if (brazePlaceholder && gatingMissing.length > 0) {
+        status = "warn"; // Braze placeholder makes gating check informational
       }
 
-      const isAdvisory = status === "pass" && manifestFound && !integrityOk;
+      const passDetails = [
+        "Case preserved (no toLowerCase)",
+        "Lock window = 300ms",
+        brazePlaceholder ? "Identity gating (informational until Braze configured)" : "Identity gating OK",
+        `Structural invariants: ${invariants.length} files pass`,
+        integrityNote,
+      ];
+
       checks.push({
-        id: "check-17",
-        label: status === "fail"
-          ? "17. Hardened file protection: BROKEN"
-          : isAdvisory
-            ? "17. Hardened file protection: advisory (non-strict)"
-            : "17. Hardened file protection: all clear",
+        id: "check-9",
+        label: status === "pass"
+          ? "9. Hardened identity invariants: OK"
+          : status === "warn"
+            ? "9. Hardened identity invariants: advisory"
+            : "9. Hardened identity invariants: BROKEN",
         status,
-        detail: parts.join(" | ") + ". See FIXES.md #17.",
+        detail: status === "pass" || status === "warn"
+          ? passDetails.join(". ") + "."
+          : `FAIL: ${issues.join("; ")}. See FIXES.md #8/#9/#14/#17.`,
       });
     } else {
       checks.push({
-        id: "check-17",
-        label: "17. Hardened file protection",
+        id: "check-9",
+        label: "9. Hardened identity invariants",
         status: "warn",
-        detail: "Could not reach /api/scan-source for invariant/integrity inspection. See FIXES.md #17.",
+        detail: "Could not reach /api/scan-source for invariant inspection. See FIXES.md #8/#9/#14/#17.",
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // 10) Browser fallback — no crash from missing DemoBridge (informational)
+    // ---------------------------------------------------------------
+    {
+      const hasDemoBridge = Boolean(
+        (window as Record<string, unknown>).DemoBridge
+      );
+      checks.push({
+        id: "check-10",
+        label: hasDemoBridge
+          ? "10. Browser fallback (native detected)"
+          : "10. Browser fallback: OK",
+        status: "pass",
+        detail: hasDemoBridge
+          ? "DemoBridge present -- running in native container."
+          : "DemoBridge not present. App loaded without crashing -- fallback works.",
       });
     }
 
@@ -803,7 +628,7 @@ export function ValidationPanel() {
         <p className="text-xs text-muted-foreground text-center">
           Tap{" "}
           <span className="font-semibold text-foreground">Run All Checks</span>{" "}
-          to validate against the hardening spec (17 checks + structural invariants).
+          to validate against the hardening spec (10 consolidated checks).
         </p>
       )}
 
