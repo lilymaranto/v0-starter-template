@@ -13,14 +13,13 @@ const DEFAULT_USER = USERS[0];
 type Tab = "app" | "validation";
 
 export default function Home() {
-  const [activeUser, setActiveUser] = useState<string>("");
+  const [activeUser, setActiveUser] = useState<string>(DEFAULT_USER);
   const [activeTab, setActiveTab] = useState<Tab>("app");
 
-  // Build dynamic options: include activeUser if non-empty and not in base USERS list
-  const selectUsers =
-    !activeUser || USERS.includes(activeUser as (typeof USERS)[number])
-      ? [...USERS]
-      : [activeUser, ...USERS];
+  // Build dynamic options: include activeUser if not in base USERS list
+  const selectUsers = USERS.includes(activeUser as (typeof USERS)[number])
+    ? [...USERS]
+    : [activeUser, ...USERS];
   const syncRef = useRef<ReturnType<typeof createSyncStateMachine> | null>(null);
   const initialized = useRef(false);
 
@@ -29,7 +28,7 @@ export default function Home() {
     initialized.current = true;
 
     const sync = createSyncStateMachine({
-      initialUserId: "",
+      initialUserId: DEFAULT_USER,
       manualLockMs: 300,
       fallbackConfigId: CONFIG_ID,
       renderUser: (userId: string) => setActiveUser(userId),
@@ -38,19 +37,15 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    // Track whether native signal arrived before fallback timeout
-    let nativeSignalReceived = false;
+    // Track whether a real native user arrived before fallback timeout
+    let nativeUserReceived = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const FALLBACK_MS = 1200; // Grace period for native container to send identity
 
-    const triggerBrowserFallback = () => {
-      if (nativeSignalReceived) return; // Native arrived in time, skip fallback
-      const hasBridge =
-        typeof window !== "undefined" && Boolean((window as any).DemoBridge);
-      if (hasBridge) return; // Container mode: wait for native/sync path
-
-      // Pure browser fallback: force default user
+    const triggerDefaultIfNoNativeUser = () => {
+      if (nativeUserReceived) return; // Real native user arrived, skip fallback
+      // Fallback to default user (works in both browser and container if no real user)
       startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
       sync.applyIncomingSync({
         userId: DEFAULT_USER,
@@ -59,21 +54,23 @@ export default function Home() {
     };
 
     initBraze().then(() => {
-      // Wait for native signal before falling back to browser mode
-      fallbackTimer = setTimeout(triggerBrowserFallback, FALLBACK_MS);
+      // Wait for native signal before falling back to default user
+      fallbackTimer = setTimeout(triggerDefaultIfNoNativeUser, FALLBACK_MS);
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
-      nativeSignalReceived = true; // Mark native signal received
-      if (fallbackTimer) clearTimeout(fallbackTimer); // Cancel pending fallback
-      if (!incomingUserId) return;
+      // Only mark received for real user IDs (not empty or "unknown")
+      if (incomingUserId && incomingUserId !== "unknown") {
+        nativeUserReceived = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+      }
+      if (!incomingUserId || incomingUserId === "unknown") return;
       sync.applyIncomingSync(
         {
           userId: incomingUserId,
           sessionId: detail?.sessionId as string | undefined,
           authority: detail?.authority as string | undefined,
           reason: (detail?.reason as string) ?? "manual",
-          // NFL pattern: native detail.configId overrides fallback when present
           configId: detail?.configId as string | undefined,
         },
         { fromNative: true }
