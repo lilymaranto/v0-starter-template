@@ -37,22 +37,32 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    initBraze().then(() => {
+    // Track whether native signal arrived before fallback timeout
+    let nativeSignalReceived = false;
+
+    const BRIDGE_WAIT_MS = 150; // Short grace period for late bridge attach
+
+    const triggerBrowserFallback = () => {
+      if (nativeSignalReceived) return; // Native arrived in time, skip fallback
       const hasBridge =
         typeof window !== "undefined" && Boolean((window as any).DemoBridge);
+      if (hasBridge) return; // Bridge attached late but present, skip fallback
 
-      // Only force default user in pure browser fallback.
-      // If bridge exists, let sync/native flow own startup identity.
-      if (!hasBridge) {
-        startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
-        sync.applyIncomingSync({
-          userId: DEFAULT_USER,
-          reason: "default",
-        });
-      }
+      // Pure browser fallback: force default user
+      startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
+      sync.applyIncomingSync({
+        userId: DEFAULT_USER,
+        reason: "default",
+      });
+    };
+
+    initBraze().then(() => {
+      // Wait briefly for native signal before falling back to browser mode
+      setTimeout(triggerBrowserFallback, BRIDGE_WAIT_MS);
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
+      nativeSignalReceived = true; // Mark native signal received
       if (!incomingUserId) return;
       sync.applyIncomingSync(
         {
