@@ -114,13 +114,33 @@ export async function setUser(
 
 export function listenForNative(
   changeUserFn: (userId: string, detail: Record<string, unknown>) => void
-) {
+): () => void {
   if (typeof changeUserFn !== "function") {
     throw new Error("listenForNative requires changeUserFn(userId, detail)");
   }
-  if (!hasBridge() || !window.DemoBridge?.initNativeListener) return;
-  window.DemoBridge.initNativeListener((incomingUserId, detail) => {
-    if (!incomingUserId) return;
-    changeUserFn(incomingUserId, detail);
-  });
+
+  let cancelled = false;
+  let attempts = 0;
+  const MAX_ATTEMPTS = 40; // ~4s total
+  const INTERVAL_MS = 100;
+
+  const attach = () => {
+    if (cancelled) return;
+    const bridge = (window as any).DemoBridge;
+    if (bridge?.initNativeListener) {
+      bridge.initNativeListener((incomingUserId: string, detail: Record<string, unknown>) => {
+        if (!incomingUserId || incomingUserId === "unknown") return;
+        changeUserFn(incomingUserId, detail ?? {});
+      });
+      return;
+    }
+    attempts += 1;
+    if (attempts < MAX_ATTEMPTS) setTimeout(attach, INTERVAL_MS);
+  };
+
+  attach();
+
+  return () => {
+    cancelled = true;
+  };
 }

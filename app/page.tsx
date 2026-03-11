@@ -27,8 +27,10 @@ export default function Home() {
     if (initialized.current) return;
     initialized.current = true;
 
-    // Guard: once a real (non-default) identity is applied, default logic is permanently disabled
+    // Guards: once a real identity is applied, default logic is permanently disabled
     let hasResolvedIdentity = false;
+    let nativeUserReceived = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const sync = createSyncStateMachine({
       initialUserId: DEFAULT_USER,
@@ -40,24 +42,12 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    const hasBridge =
-      typeof window !== "undefined" && Boolean((window as any).DemoBridge);
-
-    initBraze().then(() => {
-      // Browser-only mode: apply default user once immediately.
-      // Native container mode: never apply default -- identity comes only from native sync.
-      if (!hasBridge && !hasResolvedIdentity) {
-        hasResolvedIdentity = true;
-        startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
-        sync.applyIncomingSync({ userId: DEFAULT_USER, reason: "default" });
-      }
-    });
-
-    listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
-      // Drop invalid native users (empty or "unknown")
+    // Register native listener immediately (with retry/polling for late bridge attach)
+    const unsubscribeNative = listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
+      // listenForNative already filters empty/unknown, but double-check
       if (!incomingUserId || incomingUserId === "unknown") return;
 
-      // Mark identity as resolved to permanently disable any default fallback
+      nativeUserReceived = true;
       hasResolvedIdentity = true;
 
       sync.applyIncomingSync(
@@ -66,11 +56,35 @@ export default function Home() {
           sessionId: detail?.sessionId as string | undefined,
           authority: detail?.authority as string | undefined,
           reason: (detail?.reason as string) ?? "manual",
-          configId: detail?.configId as string | undefined,
+          configId: (detail?.configId as string | undefined) ?? CONFIG_ID,
         },
         { fromNative: true }
       );
     });
+
+    const FALLBACK_MS = 1200;
+
+    initBraze().then(() => {
+      // One-time fallback: if no native user arrives within grace period, apply default.
+      // Works in both browser-only and container mode (for config persistence).
+      fallbackTimer = setTimeout(() => {
+        if (hasResolvedIdentity) return;
+        if (!nativeUserReceived) {
+          hasResolvedIdentity = true;
+          startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
+          sync.applyIncomingSync({
+            userId: DEFAULT_USER,
+            reason: "default",
+            configId: CONFIG_ID,
+          });
+        }
+      }, FALLBACK_MS);
+    });
+
+    return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (typeof unsubscribeNative === "function") unsubscribeNative();
+    };
   }, []);
 
   function handleChangeUser(userId: string) {
