@@ -148,7 +148,8 @@ export default function Home() {
     syncRef.current?.applyIncomingSync({ userId, reason: "manual" });
   }
 
-  const profile = getProfile(activeUser);
+  // Access the current user's profile data for per-user UI rendering.
+  // Example: const profile = getProfile(activeUser);
 
   return (
     <main className="flex flex-col px-5 pb-10 pt-2">
@@ -186,52 +187,47 @@ export default function Home() {
       {/* ── App tab ─── */}
       {activeTab === "app" && (
         <div className="flex flex-col items-center gap-6">
-          {/* User identity header — changes per user */}
-          <div className="flex flex-col items-center gap-2.5 text-center">
-            <div
-              className="flex h-16 w-16 items-center justify-center rounded-full transition-colors duration-300"
-              style={{ backgroundColor: `${profile.color}22` }}
-            >
-              <span
-                className="text-xl font-bold transition-colors duration-300"
-                style={{ color: profile.color }}
-              >
-                {profile.avatar}
-              </span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground text-balance">
-              {profile.greeting}
-            </h1>
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors duration-300"
-              style={{
-                backgroundColor: `${profile.color}18`,
-                color: profile.color,
-              }}
-            >
-              {profile.role}
-            </span>
-          </div>
-
-          {/* Per-user content cards — swap entirely on user switch */}
-          <div className="flex w-full flex-col gap-3">
-            {profile.cards.map((card) => (
-              <div
-                key={card.title}
-                className="flex items-center gap-3.5 rounded-xl border border-border bg-card p-4 transition-all duration-300"
-              >
-                <span className="text-2xl leading-none">{card.icon}</span>
-                <div className="flex flex-col gap-0.5">
-                  <h3 className="text-sm font-semibold text-card-foreground">
-                    {card.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {card.body}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* Instructions */}
+          <section
+            className="w-full rounded-xl border border-border bg-card p-4"
+            aria-label="Getting started"
+          >
+            <h2 className="mb-2 text-base font-semibold text-card-foreground">
+              Start building now
+            </h2>
+            <ol className="flex flex-col gap-1.5 text-xs text-muted-foreground leading-relaxed">
+              <li>
+                <span className="font-mono text-foreground">1.</span> Edit this
+                page -- Braze + bridge wiring is pre-connected.
+                <p className="mt-1 pl-4 italic">
+                  Keep the existing infrastructure, all files in lib, and the
+                  validation checklist unchanged until the end. You may update
+                  the UI, and in braze.ts you may modify only BRAZE_API_KEY and
+                  BRAZE_BASE_URL. Help me build..
+                </p>
+              </li>
+              <li>
+                <span className="font-mono text-foreground">2.</span> Use the
+                user dropdown below or remove it if you only need one user.
+              </li>
+              <li>
+                <span className="font-mono text-foreground">3.</span> Import{" "}
+                <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
+                  trackEvent
+                </code>{" "}
+                from{" "}
+                <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
+                  @/lib/track-event
+                </code>{" "}
+                for custom events.
+              </li>
+              <li>
+                <span className="font-mono text-foreground">4.</span> Run the
+                Validation tab when you{"'"}re done. Delete the Validation tab
+                and its component when you{"'"}re finished.
+              </li>
+            </ol>
+          </section>
 
           {/* User switcher */}
           <section
@@ -271,48 +267,6 @@ export default function Home() {
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </div>
-          </section>
-
-          {/* Instructions */}
-          <section
-            className="w-full rounded-xl border border-border bg-card p-4"
-            aria-label="Getting started"
-          >
-            <h2 className="mb-2 text-base font-semibold text-card-foreground">
-              Start building now
-            </h2>
-            <ol className="flex flex-col gap-1.5 text-xs text-muted-foreground leading-relaxed">
-              <li>
-                <span className="font-mono text-foreground">1.</span> Edit this
-                page -- Braze + bridge wiring is pre-connected.
-                <p className="mt-1 pl-4 italic">
-                  Keep the existing infrastructure, all files in lib, and the
-                  validation checklist unchanged until the end. You may update
-                  the UI, and in braze.ts you may modify only BRAZE_API_KEY and
-                  BRAZE_BASE_URL. Help me build..
-                </p>
-              </li>
-              <li>
-                <span className="font-mono text-foreground">2.</span> Use the
-                user dropdown above or remove it if you only need one user.
-              </li>
-              <li>
-                <span className="font-mono text-foreground">3.</span> Import{" "}
-                <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
-                  trackEvent
-                </code>{" "}
-                from{" "}
-                <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-foreground">
-                  @/lib/track-event
-                </code>{" "}
-                for custom events.
-              </li>
-              <li>
-                <span className="font-mono text-foreground">4.</span> Run the
-                Validation tab when you{"'"}re done. Delete the Validation tab
-                and its component when you{"'"}re finished.
-              </li>
-            </ol>
           </section>
         </div>
       )}
