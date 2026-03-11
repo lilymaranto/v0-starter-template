@@ -27,6 +27,9 @@ export default function Home() {
     if (initialized.current) return;
     initialized.current = true;
 
+    // Guard: once a real (non-default) identity is applied, default logic is permanently disabled
+    let hasResolvedIdentity = false;
+
     const sync = createSyncStateMachine({
       initialUserId: DEFAULT_USER,
       manualLockMs: 300,
@@ -37,28 +40,26 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    const FALLBACK_MS = 1200; // Grace period for browser-only mode
+    const hasBridge =
+      typeof window !== "undefined" && Boolean((window as any).DemoBridge);
 
     initBraze().then(() => {
-      const hasBridge =
-        typeof window !== "undefined" && Boolean((window as any).DemoBridge);
-
-      // Native container: identity must come from native sync path only.
-      // Browser-only: use default fallback after grace period.
-      if (!hasBridge) {
-        fallbackTimer = setTimeout(() => {
-          startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
-          sync.applyIncomingSync({ userId: DEFAULT_USER, reason: "default" });
-        }, FALLBACK_MS);
+      // Browser-only mode: apply default user once immediately.
+      // Native container mode: never apply default -- identity comes only from native sync.
+      if (!hasBridge && !hasResolvedIdentity) {
+        hasResolvedIdentity = true;
+        startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
+        sync.applyIncomingSync({ userId: DEFAULT_USER, reason: "default" });
       }
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
-      // Clear any pending fallback when native signal arrives
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-      // Skip processing for empty or unknown users
+      // Drop invalid native users (empty or "unknown")
       if (!incomingUserId || incomingUserId === "unknown") return;
+
+      // Mark identity as resolved to permanently disable any default fallback
+      hasResolvedIdentity = true;
+
       sync.applyIncomingSync(
         {
           userId: incomingUserId,
@@ -70,10 +71,6 @@ export default function Home() {
         { fromNative: true }
       );
     });
-
-    return () => {
-      if (fallbackTimer) clearTimeout(fallbackTimer);
-    };
   }, []);
 
   function handleChangeUser(userId: string) {
