@@ -37,33 +37,27 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    // Track whether a real native user arrived before fallback timeout
-    let nativeUserReceived = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const FALLBACK_MS = 1200; // Grace period for native container to send identity
-
-    const triggerDefaultIfNoNativeUser = () => {
-      if (nativeUserReceived) return; // Real native user arrived, skip fallback
-      // Fallback to default user (works in both browser and container if no real user)
-      startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
-      sync.applyIncomingSync({
-        userId: DEFAULT_USER,
-        reason: "default",
-      });
-    };
+    const FALLBACK_MS = 1200; // Grace period for browser-only mode
 
     initBraze().then(() => {
-      // Wait for native signal before falling back to default user
-      fallbackTimer = setTimeout(triggerDefaultIfNoNativeUser, FALLBACK_MS);
+      const hasBridge =
+        typeof window !== "undefined" && Boolean((window as any).DemoBridge);
+
+      // Native container: identity must come from native sync path only.
+      // Browser-only: use default fallback after grace period.
+      if (!hasBridge) {
+        fallbackTimer = setTimeout(() => {
+          startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
+          sync.applyIncomingSync({ userId: DEFAULT_USER, reason: "default" });
+        }, FALLBACK_MS);
+      }
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
-      // Only mark received for real user IDs (not empty or "unknown")
-      if (incomingUserId && incomingUserId !== "unknown") {
-        nativeUserReceived = true;
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-      }
+      // Clear any pending fallback when native signal arrives
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      // Skip processing for empty or unknown users
       if (!incomingUserId || incomingUserId === "unknown") return;
       sync.applyIncomingSync(
         {
