@@ -15,6 +15,11 @@ type Tab = "app" | "validation";
 export default function Home() {
   const [activeUser, setActiveUser] = useState<string>(DEFAULT_USER);
   const [activeTab, setActiveTab] = useState<Tab>("app");
+
+  // Build dynamic options to include activeUser if not in base USERS list
+  const selectUsers = USERS.includes(activeUser as (typeof USERS)[number])
+    ? [...USERS]
+    : [activeUser, ...USERS];
   const syncRef = useRef<ReturnType<typeof createSyncStateMachine> | null>(null);
   const initialized = useRef(false);
 
@@ -32,15 +37,32 @@ export default function Home() {
     });
     syncRef.current = sync;
 
-    initBraze().then(() => {
+    // Track whether native signal arrived before fallback timeout
+    let nativeSignalReceived = false;
+
+    const BRIDGE_WAIT_MS = 150; // Short grace period for late bridge attach
+
+    const triggerBrowserFallback = () => {
+      if (nativeSignalReceived) return; // Native arrived in time, skip fallback
+      const hasBridge =
+        typeof window !== "undefined" && Boolean((window as any).DemoBridge);
+      if (hasBridge) return; // Bridge attached late but present, skip fallback
+
+      // Pure browser fallback: force default user
       startWebSession({ userId: DEFAULT_USER, configId: CONFIG_ID });
       sync.applyIncomingSync({
         userId: DEFAULT_USER,
         reason: "default",
       });
+    };
+
+    initBraze().then(() => {
+      // Wait briefly for native signal before falling back to browser mode
+      setTimeout(triggerBrowserFallback, BRIDGE_WAIT_MS);
     });
 
     listenForNative((incomingUserId: string, detail: Record<string, unknown>) => {
+      nativeSignalReceived = true; // Mark native signal received
       if (!incomingUserId) return;
       sync.applyIncomingSync(
         {
@@ -151,7 +173,7 @@ export default function Home() {
                 onChange={(e) => handleChangeUser(e.target.value)}
                 className="w-full appearance-none rounded-lg border border-border bg-secondary px-3 py-2 pr-8 text-sm font-semibold text-secondary-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                {USERS.map((user) => (
+                {selectUsers.map((user) => (
                   <option key={user} value={user}>
                     {user}
                   </option>
