@@ -4,6 +4,11 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { getBraze, initBraze } from "@/lib/braze";
 import { setUser, listenForNative, webReady } from "@/lib/bridge-entry";
 import { createSyncStateMachine } from "@/lib/sync-state";
+import {
+  installNativeUserEarlyCapture,
+  markNativeUserEarlyCaptureDone,
+  takeNativeUserSyncQueue,
+} from "@/lib/native-sync-early-capture";
 import { ValidationPanel } from "@/components/validation-panel";
 import { ReferenceTab } from "@/components/reference-tab";
 
@@ -72,6 +77,8 @@ const USERS = ["viewer_a", "viewer_b"] as const;
 const CONFIG_ID =
   process.env.NEXT_PUBLIC_SOLCON_CONFIG_ID ?? "solcon-template";
 const DEFAULT_USER = USERS[0];
+
+installNativeUserEarlyCapture();
 
 type Tab = "app" | "validation" | "reference";
 
@@ -169,39 +176,49 @@ export default function Home() {
     };
 
     // 1. Register native listener (polls for DemoBridge up to ~4 s)
+    const applyNativeSync = (
+      incomingUserId: string,
+      detail: Record<string, unknown>
+    ) => {
+      if (!incomingUserId || incomingUserId === "unknown") return;
+      setActiveTab("app");
+      nativeUserReceived = true;
+      if (nativeBootstrapTimeout) {
+        clearTimeout(nativeBootstrapTimeout);
+        nativeBootstrapTimeout = null;
+      }
+      const nativeConfigId =
+        typeof detail?.configId === "string" && detail.configId.trim()
+          ? detail.configId
+          : undefined;
+      if (nativeConfigId) {
+        const hadNativeConfigId = Boolean(nativeConfigIdRef.current);
+        nativeConfigIdRef.current = nativeConfigId;
+        if (webReadySentRef.current && !hadNativeConfigId) {
+          // Re-announce once when authoritative native configId first appears.
+          emitWebReady();
+        }
+      }
+      sync.applyIncomingSync(
+        {
+          userId: incomingUserId,
+          sessionId: detail?.sessionId as string | undefined,
+          authority: detail?.authority as string | undefined,
+          reason: (detail?.reason as string) ?? "manual",
+          configId: nativeConfigId,
+        },
+        { fromNative: true }
+      );
+    };
+
     const unsubscribeNative = listenForNative(
       (incomingUserId: string, detail: Record<string, unknown>) => {
-        if (!incomingUserId || incomingUserId === "unknown") return;
-        setActiveTab("app");
-        nativeUserReceived = true;
-        if (nativeBootstrapTimeout) {
-          clearTimeout(nativeBootstrapTimeout);
-          nativeBootstrapTimeout = null;
-        }
-        const nativeConfigId =
-          typeof detail?.configId === "string" && detail.configId.trim()
-            ? detail.configId
-            : undefined;
-        if (nativeConfigId) {
-          const hadNativeConfigId = Boolean(nativeConfigIdRef.current);
-          nativeConfigIdRef.current = nativeConfigId;
-          if (webReadySentRef.current && !hadNativeConfigId) {
-            // Re-announce once when authoritative native configId first appears.
-            emitWebReady();
-          }
-        }
-        sync.applyIncomingSync(
-          {
-            userId: incomingUserId,
-            sessionId: detail?.sessionId as string | undefined,
-            authority: detail?.authority as string | undefined,
-            reason: (detail?.reason as string) ?? "manual",
-            configId: nativeConfigId,
-          },
-          { fromNative: true }
-        );
+        applyNativeSync(incomingUserId, detail);
       }
     );
+    const earlySyncItems = takeNativeUserSyncQueue();
+    earlySyncItems.forEach((item) => applyNativeSync(item.userId, item.detail));
+    markNativeUserEarlyCaptureDone();
 
     // Initialize Braze Web SDK, then browser-only identity fallback and webReady.
     // No eager startWebSession: native runs deferred handshake with its config first.
