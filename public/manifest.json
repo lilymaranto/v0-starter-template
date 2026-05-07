@@ -1,0 +1,16 @@
+{
+  "name": "SolCon Video Player",
+  "short_name": "SolCon",
+  "description": "PWA Video Player with Braze analytics",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#e03e36",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
