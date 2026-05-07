@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { initBraze } from "@/lib/braze";
+import { getBraze, initBraze } from "@/lib/braze";
 import { setUser, listenForNative, webReady } from "@/lib/bridge-entry";
 import { createSyncStateMachine } from "@/lib/sync-state";
 import { ValidationPanel } from "@/components/validation-panel";
@@ -141,6 +141,22 @@ export default function Home() {
       });
     };
 
+    const resolveBrazeUserId = async (): Promise<string | null> => {
+      try {
+        const braze = await getBraze();
+        if (!braze || typeof (braze as any).getUser !== "function") return null;
+        const user = (braze as any).getUser();
+        if (!user) return null;
+        const rawUserId =
+          typeof user.getUserId === "function" ? user.getUserId() : user.userId;
+        const resolvedUserId = String(rawUserId ?? "").trim();
+        if (!resolvedUserId || resolvedUserId === "unknown") return null;
+        return resolvedUserId;
+      } catch {
+        return null;
+      }
+    };
+
     const scheduleWebReadyRetry = () => {
       if (webReadyRetryCount >= 6) return;
       if (hasDemoBridge()) return;
@@ -156,6 +172,7 @@ export default function Home() {
     const unsubscribeNative = listenForNative(
       (incomingUserId: string, detail: Record<string, unknown>) => {
         if (!incomingUserId || incomingUserId === "unknown") return;
+        setActiveTab("app");
         nativeUserReceived = true;
         if (nativeBootstrapTimeout) {
           clearTimeout(nativeBootstrapTimeout);
@@ -195,11 +212,25 @@ export default function Home() {
         // Native mode: wait briefly for an incoming native identity first.
         // If none arrives, bootstrap one default sync so mobile session start
         // is not blocked on cold open/reopen.
-        nativeBootstrapTimeout = setTimeout(() => {
+        nativeBootstrapTimeout = setTimeout(async () => {
           if (nativeUserReceived) return;
-          bootstrapDefaultSyncIfNeeded();
+          const brazeUserId = await resolveBrazeUserId();
+          if (brazeUserId) {
+            nativeUserReceived = true;
+            setActiveTab("app");
+            sync.applyIncomingSync(
+              {
+                userId: brazeUserId,
+                reason: "native_reconcile",
+                configId: nativeConfigIdRef.current ?? CONFIG_ID,
+              },
+              { fromNative: true }
+            );
+          } else {
+            bootstrapDefaultSyncIfNeeded();
+          }
           emitWebReady();
-        }, 350);
+        }, 1200);
       } else {
         // Browser mode: apply fallback immediately.
         bootstrapDefaultSyncIfNeeded();
