@@ -256,7 +256,7 @@ useEffect(() => {
 }
 #default-content-cards-feed .ab-feed {
   background: transparent !important;
-  border: 1px solid hsl(var(--border)) !important;
+  border: none !important;
   width: 100% !important;
   max-width: none !important;
 }
@@ -390,7 +390,7 @@ useEffect(() => {
         }
         #default-content-cards-feed .ab-feed {
           background: transparent !important;
-          border: 1px solid hsl(var(--border)) !important;
+          border: none !important;
           box-shadow: none !important;
           width: 100% !important;
           max-width: none !important;
