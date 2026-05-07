@@ -109,6 +109,8 @@ export default function Home() {
     let nativeUserReceived = false;
     let webReadyRetryTimeout: ReturnType<typeof setTimeout> | null = null;
     let nativeBootstrapTimeout: ReturnType<typeof setTimeout> | null = null;
+    let reconcileTimers: Array<ReturnType<typeof setTimeout>> = [];
+    let visibilityReconcileTimer: ReturnType<typeof setTimeout> | null = null;
     let webReadyRetryCount = 0;
     let didBootstrapDefaultSync = false;
 
@@ -162,6 +164,39 @@ export default function Home() {
       } catch {
         return null;
       }
+    };
+
+    const reconcileUiFromBrazeIdentity = async (reason = "reconcile") => {
+      const brazeUserId = await resolveBrazeUserId();
+      if (!brazeUserId) return false;
+      if (brazeUserId === sync.getActiveUserId()) return false;
+      nativeUserReceived = true;
+      setActiveTab("app");
+      sync.applyIncomingSync(
+        {
+          userId: brazeUserId,
+          reason,
+          configId: nativeConfigIdRef.current ?? CONFIG_ID,
+        },
+        { fromNative: true }
+      );
+      return true;
+    };
+
+    const scheduleStartupReconcileLadder = () => {
+      const steps = [0, 400, 1200, 2500, 5000];
+      reconcileTimers = steps.map((delayMs) =>
+        setTimeout(() => {
+          void reconcileUiFromBrazeIdentity(`startup_reconcile_${delayMs}ms`);
+        }, delayMs)
+      );
+    };
+
+    const scheduleVisibilityReconcile = (reason: string) => {
+      if (visibilityReconcileTimer) clearTimeout(visibilityReconcileTimer);
+      visibilityReconcileTimer = setTimeout(() => {
+        void reconcileUiFromBrazeIdentity(reason);
+      }, 200);
     };
 
     const scheduleWebReadyRetry = () => {
@@ -231,19 +266,8 @@ export default function Home() {
         // is not blocked on cold open/reopen.
         nativeBootstrapTimeout = setTimeout(async () => {
           if (nativeUserReceived) return;
-          const brazeUserId = await resolveBrazeUserId();
-          if (brazeUserId) {
-            nativeUserReceived = true;
-            setActiveTab("app");
-            sync.applyIncomingSync(
-              {
-                userId: brazeUserId,
-                reason: "native_reconcile",
-                configId: nativeConfigIdRef.current ?? CONFIG_ID,
-              },
-              { fromNative: true }
-            );
-          } else {
+          const reconciled = await reconcileUiFromBrazeIdentity("native_reconcile");
+          if (!reconciled) {
             bootstrapDefaultSyncIfNeeded();
           }
           emitWebReady();
@@ -253,6 +277,22 @@ export default function Home() {
         bootstrapDefaultSyncIfNeeded();
       }
       scheduleWebReadyRetry();
+      scheduleStartupReconcileLadder();
+      if (typeof document !== "undefined") {
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            scheduleVisibilityReconcile("visibility_resume");
+          }
+        });
+      }
+      if (typeof window !== "undefined") {
+        window.addEventListener("pageshow", () => {
+          scheduleVisibilityReconcile("pageshow_resume");
+        });
+        window.addEventListener("focus", () => {
+          scheduleVisibilityReconcile("window_focus");
+        });
+      }
 
       void braze;
     });
@@ -260,6 +300,8 @@ export default function Home() {
     return () => {
       if (webReadyRetryTimeout) clearTimeout(webReadyRetryTimeout);
       if (nativeBootstrapTimeout) clearTimeout(nativeBootstrapTimeout);
+      if (visibilityReconcileTimer) clearTimeout(visibilityReconcileTimer);
+      reconcileTimers.forEach(clearTimeout);
       if (typeof unsubscribeNative === "function") unsubscribeNative();
     };
   }, []);
