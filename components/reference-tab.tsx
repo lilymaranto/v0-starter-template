@@ -262,6 +262,10 @@ useEffect(() => {
 }
 #default-content-cards-feed .ab-feed-body {
   background: hsl(var(--card)) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
 }`}
         </pre>
 
@@ -401,6 +405,10 @@ useEffect(() => {
         }
         #default-content-cards-feed .ab-feed-body {
           background: hsl(var(--card)) !important;
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
+          padding: 0 !important;
         }
         #default-content-cards-feed .ab-card {
           background: hsl(var(--card)) !important;
