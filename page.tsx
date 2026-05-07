@@ -70,7 +70,7 @@ function getProfile(userId: string): UserProfile {
 
 const USERS = ["viewer_a", "viewer_b"] as const;
 const CONFIG_ID =
-  process.env.NEXT_PUBLIC_SOLCON_CONFIG_ID ?? "solcon-template";
+  process.env.NEXT_PUBLIC_SOLCON_CONFIG_ID ?? "template123-test";
 const DEFAULT_USER = USERS[0];
 
 type Tab = "app" | "validation" | "reference";
