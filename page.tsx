@@ -282,9 +282,13 @@ export default function Home() {
                 page -- Braze + bridge wiring is pre-connected.
                 <p className="mt-1 pl-4 italic">
                   Keep the existing infrastructure, all files in lib, and the
-                  validation checklist unchanged until the end. You may update
-                  the UI, and in braze.ts you may modify only BRAZE_API_KEY and
-                  BRAZE_BASE_URL. Help me build..
+                  validation checklist logic unchanged until final validation
+                  passes. You may fully update the UI and app content. You may
+                  also update app-level user modeling data (for example:
+                  external_id, mock users, personas like Creator/Explorer or
+                  Driver/Dispatcher, profile fields, and event payload values)
+                  as needed for the use case. In braze.ts, modify only
+                  BRAZE_API_KEY and BRAZE_BASE_URL. Help me build..
                 </p>
               </li>
               <li>
